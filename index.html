@@ -146,6 +146,26 @@ body{display:flex;height:100vh;overflow:hidden;background:var(--bg);color:var(--
 #lightbox-cap{margin-top:10px;color:var(--muted);font-size:12px}
 #lightbox-close{position:absolute;top:16px;right:20px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer}
 
+/* FOTO PEDESTRIAN UPLOAD */
+#pedestrian-photo-panel{position:absolute;top:50px;left:50%;transform:translateX(-50%);z-index:1001;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;display:none;width:400px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.7)}
+#pedestrian-photo-panel h3{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:4px}
+#pedestrian-photo-panel .pp-subtitle{font-size:11px;color:var(--muted);margin-bottom:12px}
+.pp-row{display:flex;gap:6px;margin-bottom:8px;align-items:center}
+.pp-label{min-width:90px;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+.pp-input{flex:1;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;outline:none}
+.pp-input:focus{border-color:var(--accent)}
+.pp-thumb-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}
+.pp-thumb{width:100%;aspect-ratio:1;object-fit:cover;border-radius:5px;border:2px solid transparent;cursor:pointer;transition:border-color .15s}
+.pp-thumb:hover,.pp-thumb.pp-active{border-color:var(--accent)}
+.pp-add-btn{width:100%;padding:6px;background:transparent;border:1px dashed var(--border);border-radius:5px;color:var(--muted);font-size:11px;cursor:pointer;transition:all .15s;margin-top:4px}
+.pp-add-btn:hover{border-color:var(--accent);color:var(--accent)}
+.pp-save-btn{width:100%;padding:7px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;margin-top:10px}
+.pp-save-btn:hover{opacity:.9}
+.pp-close-btn{float:right;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px}
+.pp-preview-wrap{position:relative}
+.pp-del-btn{position:absolute;top:2px;right:2px;background:rgba(239,68,68,.85);border:none;border-radius:3px;color:#fff;font-size:9px;cursor:pointer;padding:1px 4px;display:none}
+.pp-thumb:hover~.pp-del-btn,.pp-preview-wrap:hover .pp-del-btn{display:block}
+
 /* TOGGLE SIDEBAR */
 #toggle-sidebar{position:absolute;top:50%;left:344px;transform:translateY(-50%);z-index:1100;background:var(--panel);border:1px solid var(--border);border-radius:0 6px 6px 0;padding:8px 4px;cursor:pointer;color:var(--muted);font-size:12px;transition:left .3s}
 
@@ -248,6 +268,10 @@ body{display:flex;height:100vh;overflow:hidden;background:var(--bg);color:var(--
         <button class="act-btn act-del" id="act-del">🗑 Hapus</button>
         <button class="act-btn act-reset" id="act-reset-one">↺</button>
       </div>
+      <button id="btn-pedestrian-photo" onclick="openPedestrianPanel(activeId)"
+        style="width:100%;margin-top:6px;padding:6px 8px;background:transparent;border:1px solid var(--purple);color:var(--purple);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;display:none">
+        📸 Upload Foto Pedestrian
+      </button>
     </div>
   </div>
 
@@ -289,6 +313,38 @@ body{display:flex;height:100vh;overflow:hidden;background:var(--bg);color:var(--
     <input type="range" id="tiff-opacity" min="10" max="100" value="85" style="width:100%;accent-color:var(--accent)">
     <div style="font-size:10px;color:var(--muted);text-align:right"><span id="tiff-opacity-val">85</span>%</div>
   </div>
+</div>
+
+<!-- PEDESTRIAN PHOTO PANEL -->
+<div id="pedestrian-photo-panel">
+  <button class="pp-close-btn" onclick="closePedestrianPanel()">✕</button>
+  <h3>📸 Foto Pedestrian</h3>
+  <p class="pp-subtitle">Titik: <span id="pp-titik-id">–</span></p>
+
+  <div class="pp-row">
+    <span class="pp-label">Nama Lokasi</span>
+    <input type="text" class="pp-input" id="pp-nama" placeholder="Contoh: Trotoar Jl. Ahmad Yani">
+  </div>
+
+  <div class="pp-row" style="align-items:flex-start">
+    <span class="pp-label" style="padding-top:4px">Catatan</span>
+    <textarea class="pp-input" id="pp-catatan" rows="2" placeholder="Kondisi pedestrian, hambatan, dll." style="resize:vertical"></textarea>
+  </div>
+
+  <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px">
+    Link Foto Google Drive
+    <span style="font-weight:400;text-transform:none;color:var(--muted);font-size:10px"> (paste sharing link, bisa lebih dari 1)</span>
+  </div>
+  <div id="pp-url-list"></div>
+  <button class="pp-add-btn" onclick="addPhotoUrlField()">+ Tambah URL Foto</button>
+
+  <div id="pp-preview-section" style="display:none;margin-top:12px">
+    <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px">Preview Foto</div>
+    <div class="pp-thumb-grid" id="pp-thumb-grid"></div>
+  </div>
+
+  <button class="pp-save-btn" onclick="savePedestrianPhotos()">💾 Simpan Foto ke Titik Ini</button>
+  <div id="pp-status" style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center"></div>
 </div>
 
 <!-- LIGHTBOX -->
@@ -389,6 +445,11 @@ function buildCBList(id, vals) {
     const lbl = document.createElement('label');
     lbl.className = 'cb-item';
     lbl.innerHTML = `<input type="checkbox" value="${v}"> ${v}`;
+    // Pasang listener langsung saat elemen dibuat
+    lbl.querySelector('input').addEventListener('change', function(){
+      lbl.classList.toggle('active', this.checked);
+      renderAll();
+    });
     el.appendChild(lbl);
   });
 }
@@ -537,7 +598,15 @@ function getFiltered() {
 }
 
 document.getElementById('search').addEventListener('input', renderAll);
-document.querySelectorAll('#filter-wrap input').forEach(i=>i.addEventListener('change', renderAll));
+// Event delegation — menangkap checkbox dinamis yang dibuat setelah page load
+document.getElementById('filter-wrap').addEventListener('change', function(e){
+  if (e.target.type === 'checkbox') {
+    // Update visual active state
+    const lbl = e.target.closest('label');
+    if (lbl) lbl.classList.toggle('active', e.target.checked);
+    renderAll();
+  }
+});
 
 // ─────────────────── DETAIL PANEL ───────────────────
 function openDetail(id) {
@@ -637,6 +706,42 @@ function openDetail(id) {
   const curAct = actions[id] || '';
   document.getElementById('act-fix').classList.toggle('selected', curAct==='fix');
   document.getElementById('act-del').classList.toggle('selected', curAct==='hapus');
+
+  // Tombol foto pedestrian — tampil hanya jika jenis PEDESTRIAN
+  const isPedestrian = (d.jenis||'').toLowerCase().includes('pedestrian');
+  const ppBtn = document.getElementById('btn-pedestrian-photo');
+  ppBtn.style.display = isPedestrian ? 'block' : 'none';
+
+  // Inject foto pedestrian ke galeri jika ada
+  const ppData = pedestrianPhotos[id];
+  if (ppData && ppData.photos && ppData.photos.length > 0) {
+    // Tambahkan foto pedestrian ke galeri yang sudah ada
+    ppData.photos.forEach(p => {
+      const imgEl = document.createElement('img');
+      imgEl.className = 'gal-thumb';
+      imgEl.src = gdriveThumbnail(p.url);
+      imgEl.title = p.label + ' [Pedestrian]';
+      imgEl.style.border = '2px solid var(--purple)';
+      imgEl.onclick = () => {
+        document.querySelectorAll('.gal-thumb').forEach(t => t.classList.remove('active'));
+        imgEl.classList.add('active');
+        pm.src = gdriveOriginal(p.url);
+        pm.classList.remove('no-photo');
+        pm.onclick = () => openLightbox(gdriveOriginal(p.url), p.label);
+      };
+      imgEl.addEventListener('dblclick', () => openLightbox(gdriveOriginal(p.url), p.label));
+      gal.appendChild(imgEl);
+    });
+
+    // Tambahkan info pedestrian ke body
+    const ppSection = document.createElement('div');
+    ppSection.innerHTML = `
+      <div class="dsec" style="color:var(--purple)">🚶 Data Pedestrian</div>
+      ${ppData.nama ? `<div class="drow"><div class="dlbl">Nama Lokasi</div><div class="dval">${ppData.nama}</div></div>` : ''}
+      ${ppData.catatan ? `<div class="drow"><div class="dlbl">Catatan</div><div class="dval">${ppData.catatan}</div></div>` : ''}
+      <div class="drow"><div class="dlbl">Foto</div><div class="dval" style="color:var(--purple)">${ppData.photos.length} foto tersimpan</div></div>`;
+    body.appendChild(ppSection);
+  }
 
   document.getElementById('detail').style.display = 'flex';
 }
@@ -1089,6 +1194,138 @@ function saveActions() {
 }
 function saveAdjustments() {
   localStorage.setItem('reklame_adj', JSON.stringify(adjustments));
+}
+
+// ─────────────────── PEDESTRIAN PHOTO FEATURE ───────────────────
+// Storage: localStorage key 'reklame_pedestrian_photos' → {id: {nama, catatan, photos:[{url,label}]}}
+let pedestrianPhotos = {};
+try { pedestrianPhotos = JSON.parse(localStorage.getItem('reklame_pedestrian_photos') || '{}'); } catch(e){}
+
+function savePedestrianStorage() {
+  localStorage.setItem('reklame_pedestrian_photos', JSON.stringify(pedestrianPhotos));
+}
+
+function gdriveThumbnail(url) {
+  // Konversi sharing link GDrive ke thumbnail/direct
+  let fileId = null;
+  let m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) fileId = m[1];
+  if (!fileId) { m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/); if(m) fileId = m[1]; }
+  if (fileId) return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
+  return url;
+}
+
+function gdriveOriginal(url) {
+  let fileId = null;
+  let m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) fileId = m[1];
+  if (!fileId) { m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/); if(m) fileId = m[1]; }
+  if (fileId) return `https://drive.google.com/uc?export=view&id=${fileId}`;
+  return url;
+}
+
+function openPedestrianPanel(id) {
+  if (!id) return;
+  const d = ALL_DATA.find(x => x.id === id);
+  if (!d) return;
+
+  document.getElementById('pp-titik-id').textContent = id + (d.nama_jalan ? ' — ' + d.nama_jalan : '');
+  document.getElementById('pp-status').textContent = '';
+
+  // Load existing data jika ada
+  const existing = pedestrianPhotos[id] || {};
+  document.getElementById('pp-nama').value = existing.nama || '';
+  document.getElementById('pp-catatan').value = existing.catatan || '';
+
+  // Populate URL fields
+  const urlList = document.getElementById('pp-url-list');
+  urlList.innerHTML = '';
+  const photos = existing.photos || [];
+  if (photos.length === 0) {
+    addPhotoUrlField();
+  } else {
+    photos.forEach(p => addPhotoUrlField(p.url, p.label));
+  }
+  updatePhotoPreview();
+
+  document.getElementById('pedestrian-photo-panel').style.display = 'block';
+}
+
+function closePedestrianPanel() {
+  document.getElementById('pedestrian-photo-panel').style.display = 'none';
+}
+
+function addPhotoUrlField(url='', label='') {
+  const urlList = document.getElementById('pp-url-list');
+  const row = document.createElement('div');
+  row.className = 'pp-row pp-url-row';
+  row.style.cssText = 'margin-bottom:5px;';
+  row.innerHTML = `
+    <input type="text" class="pp-input pp-url-input" placeholder="https://drive.google.com/file/d/..." value="${url}"
+      style="flex:1" oninput="updatePhotoPreview()">
+    <input type="text" class="pp-input pp-url-label" placeholder="Keterangan" value="${label}"
+      style="width:100px;flex:none">
+    <button onclick="this.parentElement.remove();updatePhotoPreview()"
+      style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 4px">✕</button>`;
+  urlList.appendChild(row);
+}
+
+function updatePhotoPreview() {
+  const rows = document.querySelectorAll('.pp-url-row');
+  const urls = [];
+  rows.forEach(r => {
+    const url = r.querySelector('.pp-url-input').value.trim();
+    const lbl = r.querySelector('.pp-url-label').value.trim();
+    if (url) urls.push({url, label: lbl || 'Foto'});
+  });
+
+  const grid = document.getElementById('pp-thumb-grid');
+  const section = document.getElementById('pp-preview-section');
+  grid.innerHTML = '';
+
+  if (urls.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  urls.forEach(p => {
+    const wrap = document.createElement('div');
+    wrap.className = 'pp-preview-wrap';
+    const thumbUrl = gdriveThumbnail(p.url);
+    wrap.innerHTML = `
+      <img class="pp-thumb" src="${thumbUrl}" title="${p.label}"
+        onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22><rect width=%2260%22 height=%2260%22 fill=%22%23374151%22/><text x=%2250%%25%22 y=%2255%%25%22 text-anchor=%22middle%22 fill=%22%236b7280%22 font-size=%2210%22>No img</text></svg>'"
+        onclick="openLightbox('${gdriveOriginal(p.url)}','${p.label}')">
+      <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.label}</div>`;
+    grid.appendChild(wrap);
+  });
+}
+
+function savePedestrianPhotos() {
+  const id = document.getElementById('pp-titik-id').textContent.split(' — ')[0].trim();
+  if (!id) return;
+
+  const rows = document.querySelectorAll('.pp-url-row');
+  const photos = [];
+  rows.forEach(r => {
+    const url = r.querySelector('.pp-url-input').value.trim();
+    const lbl = r.querySelector('.pp-url-label').value.trim();
+    if (url) photos.push({url, label: lbl || 'Foto Pedestrian'});
+  });
+
+  pedestrianPhotos[id] = {
+    nama: document.getElementById('pp-nama').value.trim(),
+    catatan: document.getElementById('pp-catatan').value.trim(),
+    photos
+  };
+  savePedestrianStorage();
+
+  const statusEl = document.getElementById('pp-status');
+  statusEl.style.color = 'var(--green)';
+  statusEl.textContent = `✅ ${photos.length} foto tersimpan untuk ${id}`;
+
+  // Refresh detail panel jika titik ini sedang dibuka
+  if (activeId === id) openDetail(id);
+
+  setTimeout(() => closePedestrianPanel(), 1200);
 }
 
 // ─────────────────── LIGHTBOX ───────────────────
