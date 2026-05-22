@@ -294,8 +294,9 @@ body{display:flex;height:100vh;overflow:hidden;background:var(--bg);color:var(--
       <button onclick="loadTiffFromUrl()" style="padding:6px 10px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-size:11px;cursor:pointer;font-weight:600;white-space:nowrap">▶ Load</button>
     </div>
     <div style="font-size:10px;color:var(--muted);line-height:1.4">
-      💡 Di Google Drive: klik kanan file TIF → <b>Share</b> → <b>Anyone with link</b> → Copy link → paste di sini.<br>
-      Untuk performa terbaik konversi ke <b>COG</b> dulu di QGIS.
+      💡 <b>GitHub Release URL</b> (rekomendasi): upload file COG ke GitHub Release → paste URL di sini.<br>
+      <b>Google Drive</b>: pastikan share "Anyone with link" → paste sharing link.<br>
+      Untuk performa terbaik gunakan <b>COG (Cloud Optimized GeoTIFF)</b>.
     </div>
   </div>
   <div class="upl-group" style="border-top:1px solid var(--border);padding-top:8px">
@@ -826,6 +827,10 @@ document.getElementById('btn-upload').onclick = ()=>{
 
 // ─────────────────── LOAD TIFF FROM URL (Google Drive / COG) ───────────────────
 function gdriveDirect(url) {
+  // GitHub Release asset — sudah direct download, return as-is
+  if (url.includes('github.com') && url.includes('/releases/download/')) return url;
+  // GitHub raw content
+  if (url.includes('raw.githubusercontent.com')) return url;
   // Konversi berbagai format Google Drive URL ke direct download
   let fileId = null;
 
