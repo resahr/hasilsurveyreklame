@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Web GIS – Validasi Titik Reklame Kota Batam</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--sidebar:#161b27;--panel:#1e2435;--border:#2a3148;
+  --accent:#4f8ef7;--green:#22c55e;--blue:#3b82f6;--purple:#a855f7;
+  --yellow:#eab308;--red:#ef4444;--gray:#6b7280;
+  --text:#e2e8f0;--muted:#8892a4;--white:#fff;
+}
+body{display:flex;height:100vh;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:13px}
+
+/* SIDEBAR */
+#sidebar{width:340px;min-width:340px;background:var(--sidebar);display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden;transition:width .3s}
+#sidebar.collapsed{width:0;min-width:0}
+#sidebar-header{padding:12px 14px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0}
+#sidebar-header h1{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.3px}
+#sidebar-header p{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* STATS */
+#stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 12px;background:var(--bg);flex-shrink:0}
+.stat-box{background:var(--panel);border-radius:6px;padding:7px 8px;text-align:center;border:1px solid var(--border)}
+.stat-box .num{font-size:18px;font-weight:700;line-height:1}
+.stat-box .lbl{font-size:10px;color:var(--muted);margin-top:2px}
+.s-total .num{color:var(--accent)}
+.s-survey .num{color:var(--green)}
+.s-shift .num{color:var(--yellow)}
+.s-vis .num{color:var(--purple)}
+
+/* SEARCH */
+#search-wrap{padding:8px 12px;flex-shrink:0}
+#search{width:100%;padding:7px 10px;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none}
+#search:focus{border-color:var(--accent)}
+#search::placeholder{color:var(--muted)}
+
+/* FILTERS */
+#filter-wrap{padding:0 12px 8px;flex-shrink:0;max-height:260px;overflow-y:auto}
+.filter-group{margin-bottom:8px}
+.filter-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.checkbox-list{display:flex;flex-wrap:wrap;gap:4px}
+.cb-item{display:flex;align-items:center;gap:4px;background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:3px 7px;cursor:pointer;font-size:11px;transition:all .15s;user-select:none}
+.cb-item input{width:12px;height:12px;accent-color:var(--accent);cursor:pointer}
+.cb-item:hover{border-color:var(--accent);color:var(--accent)}
+.cb-item.active{border-color:var(--accent);background:#1a2540;color:var(--accent)}
+
+/* FEATURE LIST */
+#list-header{padding:6px 12px;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;border-top:1px solid var(--border);flex-shrink:0}
+#feature-list{flex:1;overflow-y:auto;padding:4px 8px}
+.feat-item{padding:8px 10px;border-radius:6px;cursor:pointer;border:1px solid transparent;transition:all .15s;margin-bottom:3px}
+.feat-item:hover{background:var(--panel);border-color:var(--border)}
+.feat-item.active{background:#1a2540;border-color:var(--accent)}
+.feat-id{font-size:11px;font-weight:600;color:var(--accent)}
+.feat-road{font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.feat-badges{display:flex;gap:3px;flex-wrap:wrap;margin-top:3px}
+.badge{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600}
+.b-p1{background:#7c2020;color:#fca5a5}.b-p2{background:#7c5a20;color:#fcd34d}.b-p3{background:#1e4030;color:#6ee7b7}
+.b-survey{background:#1e3a28;color:var(--green)}.b-nosv{background:#2a2a2a;color:var(--gray)}
+.b-shift{background:#4a3600;color:var(--yellow)}.b-action{background:#1e1e40;color:var(--blue)}
+.b-fix{background:#1e3a1e;color:var(--green)}.b-del{background:#3a1e1e;color:var(--red)}
+
+/* MAIN MAP */
+#map-wrap{flex:1;position:relative;display:flex;flex-direction:column}
+#map{flex:1}
+
+/* TOOLBAR */
+#toolbar{position:absolute;top:10px;left:10px;z-index:900;display:flex;gap:6px;flex-wrap:wrap}
+.tb-btn{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;white-space:nowrap}
+.tb-btn:hover{border-color:var(--accent);color:var(--accent)}
+.tb-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tb-sep{width:1px;background:var(--border);margin:0 2px}
+
+/* LAYER TOGGLES */
+#layer-ctrl{position:absolute;top:10px;right:10px;z-index:900;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:160px}
+#layer-ctrl h4{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.lyr-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;cursor:pointer;font-size:11px}
+.lyr-row input{accent-color:var(--accent);width:13px;height:13px;cursor:pointer}
+.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.sq{width:10px;height:10px;flex-shrink:0}
+.ln{width:14px;height:3px;flex-shrink:0;border-top:2px dashed}
+
+/* DETAIL PANEL */
+#detail{position:absolute;bottom:10px;left:10px;z-index:900;background:var(--panel);border:1px solid var(--border);border-radius:10px;width:360px;max-height:70vh;display:none;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+#detail-header{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);flex-shrink:0}
+#detail-title{font-size:13px;font-weight:700;color:var(--accent)}
+#detail-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:0 2px}
+#detail-close:hover{color:var(--red)}
+#detail-body{overflow-y:auto;flex:1}
+
+/* PHOTO SECTION */
+#photo-main{width:100%;height:160px;object-fit:cover;display:block;background:#0a0a14}
+#photo-main.no-photo{display:none}
+#gallery{display:flex;gap:4px;padding:6px 10px;overflow-x:auto;flex-shrink:0;background:#0d0d18;border-bottom:1px solid var(--border)}
+#gallery:empty{display:none}
+.gal-thumb{width:52px;height:52px;object-fit:cover;border-radius:5px;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:border-color .15s}
+.gal-thumb:hover,.gal-thumb.active{border-color:var(--accent)}
+
+/* DETAIL ROWS */
+.drow{display:flex;gap:6px;padding:5px 12px;border-bottom:1px solid #1a2030}
+.drow:last-child{border-bottom:none}
+.dlbl{min-width:110px;font-size:10px;font-weight:600;color:var(--muted);padding-top:1px;text-transform:uppercase;letter-spacing:.3px}
+.dval{font-size:11px;color:var(--text);word-break:break-all}
+.dval.coord{font-family:monospace;font-size:11px;color:var(--green)}
+.dval.shift{color:var(--yellow)}
+.dsec{padding:8px 12px 4px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;background:#131824}
+
+/* ACTION PLAN */
+#action-panel{padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0;background:#131824}
+#action-panel h4{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px}
+.action-btns{display:flex;gap:6px}
+.act-btn{flex:1;padding:6px 8px;border-radius:6px;border:1px solid;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s}
+.act-fix{border-color:var(--green);color:var(--green);background:transparent}
+.act-fix.selected{background:var(--green);color:#000}
+.act-del{border-color:var(--red);color:var(--red);background:transparent}
+.act-del.selected{background:var(--red);color:#fff}
+.act-reset{border-color:var(--gray);color:var(--gray);background:transparent;flex:0.5}
+.act-reset:hover{border-color:var(--text);color:var(--text)}
+
+/* BOTTOM EXPORT */
+#export-bar{position:absolute;bottom:10px;right:10px;z-index:900;display:flex;flex-direction:column;gap:5px}
+.exp-btn{background:var(--panel);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;text-align:center;transition:all .15s}
+.exp-btn:hover{border-color:var(--accent);color:var(--accent)}
+.exp-geojson:hover{border-color:var(--green);color:var(--green)}
+.exp-csv:hover{border-color:var(--yellow);color:var(--yellow)}
+.exp-action:hover{border-color:var(--purple);color:var(--purple)}
+.exp-reset:hover{border-color:var(--red);color:var(--red)}
+
+/* UPLOAD PANEL */
+#upload-panel{position:absolute;top:50px;left:50%;transform:translateX(-50%);z-index:1000;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;display:none;width:340px;box-shadow:0 8px 32px rgba(0,0,0,.7)}
+#upload-panel h3{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:12px}
+.upl-group{margin-bottom:10px}
+.upl-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.upl-input{width:100%;padding:6px 8px;background:var(--bg);border:1px dashed var(--border);border-radius:6px;color:var(--text);font-size:11px;cursor:pointer}
+.upl-input:hover{border-color:var(--accent)}
+.upl-close{float:right;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px}
+
+/* LIGHTBOX */
+#lightbox{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;flex-direction:column}
+#lightbox img{max-width:90vw;max-height:80vh;border-radius:8px;object-fit:contain}
+#lightbox-cap{margin-top:10px;color:var(--muted);font-size:12px}
+#lightbox-close{position:absolute;top:16px;right:20px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer}
+
+/* TOGGLE SIDEBAR */
+#toggle-sidebar{position:absolute;top:50%;left:344px;transform:translateY(-50%);z-index:1100;background:var(--panel);border:1px solid var(--border);border-radius:0 6px 6px 0;padding:8px 4px;cursor:pointer;color:var(--muted);font-size:12px;transition:left .3s}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* LEGEND */
+.legend-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:middle}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>📍 Web GIS – Titik Reklame Batam</h1>
+    <p>Validasi & Action Plan Survey Lapangan</p>
+  </div>
+  <div id="stats">
+    <div class="stat-box s-total"><div class="num" id="s-total">0</div><div class="lbl">Total</div></div>
+    <div class="stat-box s-survey"><div class="num" id="s-survey">0</div><div class="lbl">Survei</div></div>
+    <div class="stat-box s-shift"><div class="num" id="s-shift">0</div><div class="lbl">Digeser</div></div>
+    <div class="stat-box s-vis"><div class="num" id="s-vis">0</div><div class="lbl">Tampil</div></div>
+  </div>
+  <div id="search-wrap">
+    <input id="search" type="text" placeholder="🔍 Cari ID, nama jalan…">
+  </div>
+  <div id="filter-wrap">
+    <div class="filter-group">
+      <div class="filter-label">Kecamatan</div>
+      <div class="checkbox-list" id="f-kecamatan"></div>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Prioritas</div>
+      <div class="checkbox-list" id="f-prioritas"></div>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Jenis Titik</div>
+      <div class="checkbox-list" id="f-jenis"></div>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Status Survei</div>
+      <div class="checkbox-list" id="f-status">
+        <label class="cb-item"><input type="checkbox" value="surveyed"> Sudah Survei</label>
+        <label class="cb-item"><input type="checkbox" value="unsurveyed"> Belum Survei</label>
+        <label class="cb-item"><input type="checkbox" value="shifted"> Digeser</label>
+      </div>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Action Plan</div>
+      <div class="checkbox-list" id="f-action">
+        <label class="cb-item"><input type="checkbox" value="fix"> Titik Fix</label>
+        <label class="cb-item"><input type="checkbox" value="hapus"> Hapus</label>
+        <label class="cb-item"><input type="checkbox" value=""> Belum Ditentukan</label>
+      </div>
+    </div>
+  </div>
+  <div id="list-header" id="list-header">Titik — <span id="list-count">0</span> tampil</div>
+  <div id="feature-list"></div>
+</div>
+
+<button id="toggle-sidebar" title="Toggle Sidebar">‹</button>
+
+<div id="map-wrap">
+  <div id="map"></div>
+
+  <div id="toolbar">
+    <button class="tb-btn" id="btn-fit">🗺 Fit All</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-upload">📤 Upload Basemap/KML</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-reset-drag">↺ Reset Posisi</button>
+  </div>
+
+  <div id="layer-ctrl">
+    <h4>Layer</h4>
+    <label class="lyr-row"><input type="checkbox" id="lyr-survey" checked> <span class="dot" style="background:#22c55e"></span> Titik Survei</label>
+    <label class="lyr-row"><input type="checkbox" id="lyr-ref" checked> <span class="sq" style="background:#3b82f6"></span> Titik Referensi</label>
+    <label class="lyr-row"><input type="checkbox" id="lyr-lines" checked> <span class="ln" style="border-color:#a855f7"></span> Garis Offset</label>
+    <label class="lyr-row"><input type="checkbox" id="lyr-unsurv" checked> <span class="dot" style="background:#6b7280"></span> Belum Survei</label>
+    <hr style="border-color:var(--border);margin:7px 0">
+    <h4>Basemap</h4>
+    <label class="lyr-row"><input type="radio" name="basemap" value="dark" checked> Dark</label>
+    <label class="lyr-row"><input type="radio" name="basemap" value="osm"> OpenStreetMap</label>
+    <label class="lyr-row"><input type="radio" name="basemap" value="sat"> Satellite</label>
+    <label class="lyr-row"><input type="radio" name="basemap" value="tiff"> 📸 Ortho (TIFF)</label>
+  </div>
+
+  <div id="detail">
+    <div id="detail-header">
+      <span id="detail-title">—</span>
+      <button id="detail-close">✕</button>
+    </div>
+    <img id="photo-main" src="" alt="Foto utama">
+    <div id="gallery"></div>
+    <div id="detail-body"></div>
+    <div id="action-panel">
+      <h4>Action Plan Titik Ini</h4>
+      <div class="action-btns">
+        <button class="act-btn act-fix" id="act-fix">✅ Titik Fix</button>
+        <button class="act-btn act-del" id="act-del">🗑 Hapus</button>
+        <button class="act-btn act-reset" id="act-reset-one">↺</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="export-bar">
+    <button class="exp-btn exp-geojson" onclick="exportGeoJSON()">⬇ Export GeoJSON</button>
+    <button class="exp-btn exp-csv" onclick="exportCSV()">⬇ Export CSV Lengkap</button>
+    <button class="exp-btn exp-action" onclick="exportActionCSV()">📋 Export Action Plan CSV</button>
+  </div>
+</div>
+
+<!-- UPLOAD PANEL -->
+<div id="upload-panel">
+  <button class="upl-close" onclick="document.getElementById('upload-panel').style.display='none'">✕</button>
+  <h3>Upload Basemap / Data Tambahan</h3>
+  <div class="upl-group">
+    <div class="upl-label">Foto Ortho / TIFF (sebagai basemap)</div>
+    <input type="file" class="upl-input" id="upload-tiff" accept=".tif,.tiff,.png,.jpg">
+  </div>
+  <div class="upl-group">
+    <div class="upl-label">KML / KMZ (titik tambahan)</div>
+    <input type="file" class="upl-input" id="upload-kml" accept=".kml,.kmz">
+  </div>
+  <div id="upload-status" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5"></div>
+  <div id="tiff-opacity-wrap" style="display:none;margin-top:10px">
+    <div class="upl-label">Opacity Ortho</div>
+    <input type="range" id="tiff-opacity" min="10" max="100" value="85" style="width:100%;accent-color:var(--accent)">
+    <div style="font-size:10px;color:var(--muted);text-align:right"><span id="tiff-opacity-val">85</span>%</div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox" onclick="closeLightbox()">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lb-img" src="" alt="">
+  <div id="lightbox-cap"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="libs/geotiff.js"></script>
+<script src="libs/georaster.js"></script>
+<script src="libs/georaster-layer-for-leaflet.js"></script>
+<script>
+// ─────────────────── STATE ───────────────────
+let ALL_DATA = [];
+let markers = {};        // id -> {surveyMarker, refMarker, line}
+let adjustments = {};    // id -> {lat, lng}
+let actions = {};        // id -> 'fix' | 'hapus' | ''
+let activeId = null;
+let kmlLayer = null;
+let tiffLayer = null;
+let clusterSurvey, clusterUnsurv, layerRef, layerLines;
+
+// ─────────────────── MAP INIT ───────────────────
+const map = L.map('map', {zoomControl: false}).setView([1.05, 103.97], 12);
+L.control.zoom({position:'bottomright'}).addTo(map);
+
+const basemaps = {
+  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'©CartoDB',maxZoom:20}),
+  osm:  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'©OSM',maxZoom:20}),
+  sat:  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20})
+};
+basemaps.dark.addTo(map);
+
+// layer groups
+clusterSurvey = L.markerClusterGroup({maxClusterRadius:40,disableClusteringAtZoom:15});
+clusterUnsurv = L.markerClusterGroup({maxClusterRadius:40,disableClusteringAtZoom:15});
+layerRef   = L.layerGroup();
+layerLines = L.layerGroup();
+map.addLayer(clusterSurvey);
+map.addLayer(clusterUnsurv);
+map.addLayer(layerRef);
+map.addLayer(layerLines);
+
+// ─────────────────── ICONS ───────────────────
+function surveyIcon(shifted) {
+  return L.divIcon({
+    html:`<svg width="22" height="28" viewBox="0 0 22 28"><path d="M11 0C5 0 0 5 0 11c0 8 11 17 11 17S22 19 22 11C22 5 17 0 11 0z" fill="${shifted?'#eab308':'#22c55e'}"/><circle cx="11" cy="11" r="5" fill="white" opacity=".9"/></svg>`,
+    className:'', iconSize:[22,28], iconAnchor:[11,28], popupAnchor:[0,-28]
+  });
+}
+const refIcon = L.divIcon({
+  html:`<svg width="14" height="14" viewBox="0 0 14 14"><rect width="14" height="14" rx="2" fill="#3b82f6" opacity=".85"/><rect x="5" y="5" width="4" height="4" fill="white"/></svg>`,
+  className:'', iconSize:[14,14], iconAnchor:[7,7]
+});
+const unIcon = L.divIcon({
+  html:`<svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="#6b7280" opacity=".7" stroke="#4b5563" stroke-width="1"/></svg>`,
+  className:'', iconSize:[10,10], iconAnchor:[5,5]
+});
+
+// ─────────────────── LOAD DATA ───────────────────
+fetch('data/survey_data.json')
+  .then(r=>r.json())
+  .then(data=>{
+    ALL_DATA = data;
+    // restore actions from localStorage
+    try {
+      const saved = JSON.parse(localStorage.getItem('reklame_actions')||'{}');
+      actions = saved;
+    } catch(e){}
+    try {
+      const savedAdj = JSON.parse(localStorage.getItem('reklame_adj')||'{}');
+      adjustments = savedAdj;
+    } catch(e){}
+    buildFilters();
+    renderAll();
+    updateStats();
+  })
+  .catch(e=>console.error('Data load error:',e));
+
+// ─────────────────── BUILD FILTERS ───────────────────
+function buildFilters() {
+  const kec = [...new Set(ALL_DATA.map(d=>d.kecamatan).filter(Boolean))].sort();
+  const pri = [...new Set(ALL_DATA.map(d=>d.prioritas).filter(Boolean))].sort();
+  const jen = [...new Set(ALL_DATA.map(d=>d.jenis).filter(Boolean))].sort();
+
+  buildCBList('f-kecamatan', kec);
+  buildCBList('f-prioritas', pri);
+  buildCBList('f-jenis', jen);
+}
+
+function buildCBList(id, vals) {
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  vals.forEach(v=>{
+    const lbl = document.createElement('label');
+    lbl.className = 'cb-item';
+    lbl.innerHTML = `<input type="checkbox" value="${v}"> ${v}`;
+    el.appendChild(lbl);
+  });
+}
+
+// ─────────────────── RENDER ───────────────────
+function renderAll() {
+  // clear
+  clusterSurvey.clearLayers();
+  clusterUnsurv.clearLayers();
+  layerRef.clearLayers();
+  layerLines.clearLayers();
+  markers = {};
+
+  const filtered = getFiltered();
+  const fl = document.getElementById('feature-list');
+  fl.innerHTML = '';
+
+  filtered.forEach(d=>{
+    const adj = adjustments[d.id];
+    const sLat = adj ? adj.lat : d.survey_lat;
+    const sLng = adj ? adj.lng : d.survey_lng;
+    const hasSurvey = sLat && sLng;
+    const hasRef = d.ref_lat && d.ref_lng;
+    const dist = (hasSurvey && hasRef) ? haversine(sLat,sLng,d.ref_lat,d.ref_lng) : null;
+    const shifted = dist && dist > 5;
+
+    // Survey marker
+    if (hasSurvey) {
+      const m = L.marker([sLat, sLng], {
+        icon: surveyIcon(shifted),
+        draggable: true,
+        title: d.id
+      });
+      m.on('click', ()=>openDetail(d.id));
+      m.on('dragend', e=>{
+        const {lat, lng} = e.target.getLatLng();
+        adjustments[d.id] = {lat, lng};
+        saveAdjustments();
+        updateLine(d.id);
+        if (activeId === d.id) openDetail(d.id);
+        updateStats();
+      });
+      clusterSurvey.addLayer(m);
+      markers[d.id] = markers[d.id] || {};
+      markers[d.id].survey = m;
+    }
+
+    // Ref marker
+    if (hasRef) {
+      const ref = L.marker([d.ref_lat, d.ref_lng], {icon: refIcon, title: d.id + ' (ref)'});
+      ref.on('click', ()=>openDetail(d.id));
+      if (!hasSurvey) {
+        clusterUnsurv.addLayer(ref);
+      } else {
+        layerRef.addLayer(ref);
+      }
+      markers[d.id] = markers[d.id] || {};
+      markers[d.id].ref = ref;
+    }
+
+    // Connecting line
+    if (hasSurvey && hasRef) {
+      const line = L.polyline([[sLat,sLng],[d.ref_lat,d.ref_lng]], {
+        color:'#a855f7', weight:1.5, opacity:0.7, dashArray:'5,4'
+      });
+      layerLines.addLayer(line);
+      markers[d.id].line = line;
+    }
+
+    // Sidebar list item
+    const item = document.createElement('div');
+    item.className = 'feat-item';
+    item.dataset.id = d.id;
+    const act = actions[d.id] || '';
+    item.innerHTML = `
+      <div class="feat-id">${d.id}</div>
+      <div class="feat-road">${d.nama_jalan || '–'}</div>
+      <div class="feat-badges">
+        ${badgePrioritas(d.prioritas)}
+        ${hasSurvey ? '<span class="badge b-survey">Survei</span>' : '<span class="badge b-nosv">Belum</span>'}
+        ${shifted ? '<span class="badge b-shift">Digeser</span>' : ''}
+        ${act === 'fix' ? '<span class="badge b-fix">Fix</span>' : ''}
+        ${act === 'hapus' ? '<span class="badge b-del">Hapus</span>' : ''}
+      </div>`;
+    item.addEventListener('click', ()=>{
+      openDetail(d.id);
+      if (markers[d.id]?.survey) map.setView(markers[d.id].survey.getLatLng(), 17);
+      else if (markers[d.id]?.ref) map.setView(markers[d.id].ref.getLatLng(), 17);
+    });
+    fl.appendChild(item);
+  });
+
+  document.getElementById('list-count').textContent = filtered.length;
+  updateStats();
+}
+
+function updateLine(id) {
+  const d = ALL_DATA.find(x=>x.id===id);
+  if (!d) return;
+  const adj = adjustments[id];
+  const sLat = adj ? adj.lat : d.survey_lat;
+  const sLng = adj ? adj.lng : d.survey_lng;
+  if (markers[id]?.line) {
+    markers[id].line.setLatLngs([[sLat,sLng],[d.ref_lat,d.ref_lng]]);
+  }
+  if (markers[id]?.survey) {
+    markers[id].survey.setLatLng([sLat,sLng]);
+    const dist = haversine(sLat,sLng,d.ref_lat,d.ref_lng);
+    markers[id].survey.setIcon(surveyIcon(dist>5));
+  }
+}
+
+// ─────────────────── FILTERS ───────────────────
+function getFilterVals(id) {
+  return [...document.querySelectorAll(`#${id} input:checked`)].map(i=>i.value);
+}
+
+function getFiltered() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  const kec = getFilterVals('f-kecamatan');
+  const pri = getFilterVals('f-prioritas');
+  const jen = getFilterVals('f-jenis');
+  const sts = getFilterVals('f-status');
+  const act = getFilterVals('f-action');
+
+  return ALL_DATA.filter(d=>{
+    if (q && !d.id.toLowerCase().includes(q) && !(d.nama_jalan||'').toLowerCase().includes(q)) return false;
+    if (kec.length && !kec.includes(d.kecamatan)) return false;
+    if (pri.length && !pri.includes(d.prioritas)) return false;
+    if (jen.length && !jen.includes(d.jenis)) return false;
+    if (act.length && !act.includes(actions[d.id]||'')) return false;
+    if (sts.length) {
+      const has = d.survey_lat && d.survey_lng;
+      const adj = adjustments[d.id];
+      const sLat = adj?adj.lat:d.survey_lat, sLng=adj?adj.lng:d.survey_lng;
+      const dist = (has && d.ref_lat) ? haversine(sLat,sLng,d.ref_lat,d.ref_lng) : 0;
+      const shifted = dist > 5;
+      let pass = false;
+      if (sts.includes('surveyed') && has) pass = true;
+      if (sts.includes('unsurveyed') && !has) pass = true;
+      if (sts.includes('shifted') && shifted) pass = true;
+      if (!pass) return false;
+    }
+    return true;
+  });
+}
+
+document.getElementById('search').addEventListener('input', renderAll);
+document.querySelectorAll('#filter-wrap input').forEach(i=>i.addEventListener('change', renderAll));
+
+// ─────────────────── DETAIL PANEL ───────────────────
+function openDetail(id) {
+  activeId = id;
+  const d = ALL_DATA.find(x=>x.id===id);
+  if (!d) return;
+
+  const adj = adjustments[id];
+  const sLat = adj ? adj.lat : d.survey_lat;
+  const sLng = adj ? adj.lng : d.survey_lng;
+  const dist = (sLat && d.ref_lat) ? haversine(sLat,sLng,d.ref_lat,d.ref_lng) : null;
+  const shifted = dist && dist > 5;
+
+  // highlight sidebar
+  document.querySelectorAll('.feat-item').forEach(el=>{
+    el.classList.toggle('active', el.dataset.id === id);
+  });
+
+  // Title
+  document.getElementById('detail-title').textContent = d.id;
+
+  // Photo
+  const pm = document.getElementById('photo-main');
+  if (d.front_photo) {
+    pm.src = d.front_photo;
+    pm.classList.remove('no-photo');
+    pm.onclick = ()=>openLightbox(d.front_photo,'Kondisi Lahan Front View');
+  } else {
+    pm.src=''; pm.classList.add('no-photo');
+  }
+
+  // Gallery
+  const gal = document.getElementById('gallery');
+  gal.innerHTML = '';
+  if (d.photos && d.photos.length) {
+    d.photos.forEach(p=>{
+      const img = document.createElement('img');
+      img.className = 'gal-thumb';
+      img.src = p.url;
+      img.title = p.label;
+      if (p.url === d.front_photo) img.classList.add('active');
+      img.onclick = ()=>{
+        document.querySelectorAll('.gal-thumb').forEach(t=>t.classList.remove('active'));
+        img.classList.add('active');
+        pm.src = p.url;
+        pm.classList.remove('no-photo');
+        pm.onclick = ()=>openLightbox(p.url, p.label);
+      };
+      img.addEventListener('dblclick', ()=>openLightbox(p.url, p.label));
+      gal.appendChild(img);
+    });
+  }
+
+  // Body
+  const body = document.getElementById('detail-body');
+  body.innerHTML = `
+    <div class="dsec">📍 Koordinat</div>
+    <div class="drow"><div class="dlbl">Survei (AG/AH)</div><div class="dval coord">${sLat?sLat.toFixed(6):'–'}, ${sLng?sLng.toFixed(6):'–'}${adj?' <span style="color:var(--yellow);font-size:9px">✏ ADJUSTED</span>':''}</div></div>
+    <div class="drow"><div class="dlbl">Referensi (U/V)</div><div class="dval coord">${d.ref_lat?d.ref_lat.toFixed(6):'–'}, ${d.ref_lng?d.ref_lng.toFixed(6):'–'}</div></div>
+    <div class="drow"><div class="dlbl">Offset Jarak</div><div class="dval ${shifted?'shift':''}">${dist?dist.toFixed(1)+' m <span style="font-size:9px">'+(shifted?'🔴 DIGESER':'🟢 OK')+'</span>':'–'}</div></div>
+
+    <div class="dsec">📋 Informasi Titik</div>
+    <div class="drow"><div class="dlbl">ID Lama</div><div class="dval">${d.id_lama||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Jenis</div><div class="dval">${d.jenis||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Tipe</div><div class="dval">${d.tipe||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Nama Jalan</div><div class="dval">${d.nama_jalan||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Kelurahan</div><div class="dval">${d.kelurahan||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Kecamatan</div><div class="dval">${d.kecamatan||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Prioritas</div><div class="dval">${d.prioritas||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Skor Final</div><div class="dval">${d.skor_final||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Pola Ruang</div><div class="dval">${d.pola_ruang||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Flag Krusial</div><div class="dval">${d.flag_krusial||'–'}</div></div>
+
+    <div class="dsec">👷 Data Survei</div>
+    <div class="drow"><div class="dlbl">Surveyor</div><div class="dval">${d.surveyor||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Tim</div><div class="dval">${d.tim_id||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Tgl Survey</div><div class="dval">${d.tgl_survey||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Status</div><div class="dval">${d.status||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Kemiringan</div><div class="dval">${d.kemiringan||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Kondisi Lahan</div><div class="dval">${d.kondisi_lahan||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Visibilitas</div><div class="dval">${d.visibilitas_jalan||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Catatan</div><div class="dval">${d.catatan||'–'}</div></div>
+
+    <div class="dsec">💰 Rekomendasi & Sewa</div>
+    <div class="drow"><div class="dlbl">Tier Lokasi</div><div class="dval">${d.tier_lokasi||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Format Reklame</div><div class="dval">${d.format_reklame||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Harga Sewa</div><div class="dval">${d.harga_sewa?'Rp '+d.harga_sewa+' jt/bln':'–'}</div></div>
+    <div class="drow"><div class="dlbl">Status Sewa</div><div class="dval">${d.status_sewa||'–'}</div></div>
+
+    <div class="dsec">✅ Keputusan</div>
+    <div class="drow"><div class="dlbl">Koord. Tim</div><div class="dval">${d.keputusan_koordinator||'–'}</div></div>
+    <div class="drow"><div class="dlbl">GIS</div><div class="dval">${d.keputusan_gis||'–'}</div></div>
+    <div class="drow"><div class="dlbl">Catatan GIS</div><div class="dval">${d.catatan_gis||'–'}</div></div>
+  `;
+
+  // Action buttons
+  const curAct = actions[id] || '';
+  document.getElementById('act-fix').classList.toggle('selected', curAct==='fix');
+  document.getElementById('act-del').classList.toggle('selected', curAct==='hapus');
+
+  document.getElementById('detail').style.display = 'flex';
+}
+
+document.getElementById('detail-close').onclick = ()=>{
+  document.getElementById('detail').style.display='none';
+  activeId=null;
+  document.querySelectorAll('.feat-item').forEach(el=>el.classList.remove('active'));
+};
+
+document.getElementById('act-fix').onclick = ()=>{
+  if (!activeId) return;
+  actions[activeId] = actions[activeId]==='fix' ? '' : 'fix';
+  saveActions();
+  openDetail(activeId);
+  renderAll();
+};
+document.getElementById('act-del').onclick = ()=>{
+  if (!activeId) return;
+  actions[activeId] = actions[activeId]==='hapus' ? '' : 'hapus';
+  saveActions();
+  openDetail(activeId);
+  renderAll();
+};
+document.getElementById('act-reset-one').onclick = ()=>{
+  if (!activeId) return;
+  actions[activeId] = '';
+  saveActions();
+  openDetail(activeId);
+  renderAll();
+};
+
+// ─────────────────── LAYER TOGGLES ───────────────────
+document.getElementById('lyr-survey').onchange = e=>e.target.checked?map.addLayer(clusterSurvey):map.removeLayer(clusterSurvey);
+document.getElementById('lyr-ref').onchange = e=>e.target.checked?map.addLayer(layerRef):map.removeLayer(layerRef);
+document.getElementById('lyr-lines').onchange = e=>e.target.checked?map.addLayer(layerLines):map.removeLayer(layerLines);
+document.getElementById('lyr-unsurv').onchange = e=>e.target.checked?map.addLayer(clusterUnsurv):map.removeLayer(clusterUnsurv);
+
+document.querySelectorAll('input[name="basemap"]').forEach(r=>{
+  r.onchange = ()=>{
+    // Hapus semua basemap
+    Object.values(basemaps).forEach(b => map.removeLayer(b));
+    if (tiffLayer) map.removeLayer(tiffLayer);
+
+    if (r.value === 'tiff') {
+      if (tiffLayer) {
+        tiffLayer.addTo(map);
+      } else {
+        // Belum ada TIFF — buka panel upload dan kembalikan ke dark
+        document.getElementById('upload-panel').style.display = 'block';
+        document.getElementById('upload-status').textContent = '⬆️ Upload file foto ortho/PNG di sini.';
+        basemaps.dark.addTo(map);
+        document.querySelector('input[name="basemap"][value="dark"]').checked = true;
+      }
+    } else if (basemaps[r.value]) {
+      basemaps[r.value].addTo(map);
+    }
+  };
+});
+
+// ─────────────────── TOOLBAR ───────────────────
+document.getElementById('btn-fit').onclick = ()=>{
+  const pts = [];
+  ALL_DATA.forEach(d=>{
+    if(d.survey_lat) pts.push([d.survey_lat, d.survey_lng]);
+    if(d.ref_lat) pts.push([d.ref_lat, d.ref_lng]);
+  });
+  if(pts.length) map.fitBounds(pts, {padding:[40,40]});
+};
+
+document.getElementById('btn-reset-drag').onclick = ()=>{
+  if(!confirm('Reset semua posisi yang sudah di-drag?')) return;
+  adjustments = {};
+  localStorage.removeItem('reklame_adj');
+  renderAll();
+};
+
+document.getElementById('btn-upload').onclick = ()=>{
+  const p = document.getElementById('upload-panel');
+  p.style.display = p.style.display==='none'?'block':'none';
+};
+
+// ─────────────────── UPLOAD TIFF ───────────────────
+document.getElementById('upload-tiff').onchange = function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById('upload-status');
+  const isTiff = /\.(tif|tiff)$/i.test(file.name);
+
+  // Hapus layer lama
+  if (tiffLayer) { map.removeLayer(tiffLayer); tiffLayer = null; }
+
+  if (isTiff && typeof parseGeoraster !== 'undefined') {
+    // ── GeoTIFF georeferensi via georaster ──
+    statusEl.textContent = `⏳ Memuat GeoTIFF: ${file.name}…`;
+
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      parseGeoraster(ev.target.result).then(function(georaster) {
+        tiffLayer = new GeoRasterLayer({
+          georaster: georaster,
+          opacity: 0.85,
+          resolution: 256,
+          // Render sebagai RGB natural color
+          pixelValuesToColorFn: function(vals) {
+            // Jika single band (grayscale)
+            if (vals.length === 1) {
+              const v = Math.min(255, Math.max(0, vals[0]));
+              return `rgba(${v},${v},${v},1)`;
+            }
+            // Multi-band: ambil R,G,B (band 1,2,3)
+            const r = Math.min(255, Math.max(0, vals[0]));
+            const g = Math.min(255, Math.max(0, vals[1]));
+            const b = Math.min(255, Math.max(0, vals[2]));
+            // Skip nodata (biasanya 0,0,0 atau 255,255,255 di semua band)
+            if (r === 0 && g === 0 && b === 0) return null;
+            return `rgba(${r},${g},${b},1)`;
+          }
+        });
+
+        // Switch basemap
+        Object.values(basemaps).forEach(b => map.removeLayer(b));
+        tiffLayer.addTo(map);
+        map.fitBounds(tiffLayer.getBounds());
+
+        // Update radio button
+        document.querySelectorAll('input[name="basemap"]').forEach(r => r.checked = r.value === 'tiff');
+
+        const bounds = tiffLayer.getBounds();
+        statusEl.textContent = `✅ GeoTIFF berhasil dimuat: ${file.name} | Extent: ${bounds.getSouthWest().lat.toFixed(4)},${bounds.getSouthWest().lng.toFixed(4)} → ${bounds.getNorthEast().lat.toFixed(4)},${bounds.getNorthEast().lng.toFixed(4)}`;
+        document.getElementById('tiff-opacity-wrap').style.display = 'block';
+      }).catch(function(err) {
+        statusEl.textContent = `❌ Error membaca GeoTIFF: ${err.message}`;
+        console.error(err);
+      });
+    };
+    reader.onerror = () => { statusEl.textContent = '❌ Gagal membaca file.'; };
+    reader.readAsArrayBuffer(file);
+
+  } else if (!isTiff) {
+    // ── PNG / JPG — overlay dengan bounds dari data ──
+    const url = URL.createObjectURL(file);
+    const pts = [];
+    ALL_DATA.forEach(d => {
+      if (d.survey_lat) pts.push([d.survey_lat, d.survey_lng]);
+      if (d.ref_lat)    pts.push([d.ref_lat, d.ref_lng]);
+    });
+    let bounds;
+    if (pts.length) {
+      const lats = pts.map(p=>p[0]), lngs = pts.map(p=>p[1]);
+      const pLat = (Math.max(...lats)-Math.min(...lats))*0.02;
+      const pLng = (Math.max(...lngs)-Math.min(...lngs))*0.02;
+      bounds = [[Math.min(...lats)-pLat, Math.min(...lngs)-pLng],[Math.max(...lats)+pLat, Math.max(...lngs)+pLng]];
+    } else {
+      bounds = map.getBounds();
+    }
+    tiffLayer = L.imageOverlay(url, bounds, {opacity:0.85, interactive:false});
+    Object.values(basemaps).forEach(b => map.removeLayer(b));
+    tiffLayer.addTo(map);
+    map.fitBounds(bounds);
+    document.querySelectorAll('input[name="basemap"]').forEach(r => r.checked = r.value === 'tiff');
+    statusEl.textContent = `✅ ${file.name} tampil sebagai basemap ortho.`;
+    document.getElementById('tiff-opacity-wrap').style.display = 'block';
+
+  } else {
+    statusEl.textContent = '❌ Library GeoTIFF belum termuat. Coba refresh halaman.';
+  }
+};
+
+// Opacity slider untuk TIFF
+document.getElementById('tiff-opacity').oninput = function() {
+  const v = parseInt(this.value);
+  document.getElementById('tiff-opacity-val').textContent = v;
+  if (tiffLayer) tiffLayer.setOpacity(v/100);
+};
+
+// ─────────────────── UPLOAD KML ───────────────────
+document.getElementById('upload-kml').onchange = function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    if (kmlLayer) { map.removeLayer(kmlLayer); kmlLayer=null; }
+    try {
+      const parser = new DOMParser();
+      const kmlDoc = parser.parseFromString(ev.target.result, 'text/xml');
+      const placemarks = kmlDoc.querySelectorAll('Placemark');
+      kmlLayer = L.layerGroup();
+      let count = 0;
+      placemarks.forEach(pm=>{
+        const name = pm.querySelector('name')?.textContent || 'KML Point';
+        const coords = pm.querySelector('coordinates')?.textContent?.trim();
+        if (coords) {
+          const parts = coords.split(',');
+          if (parts.length >= 2) {
+            const lng = parseFloat(parts[0]), lat = parseFloat(parts[1]);
+            if (!isNaN(lat) && !isNaN(lng)) {
+              const m = L.circleMarker([lat,lng],{radius:6,color:'#f97316',fillColor:'#f97316',fillOpacity:.8,weight:2});
+              m.bindTooltip(name);
+              m.on('click',()=>{
+                const popup = L.popup().setLatLng([lat,lng]).setContent(`<b>${name}</b><br>Lat: ${lat}<br>Lng: ${lng}`).openOn(map);
+              });
+              kmlLayer.addLayer(m);
+              count++;
+            }
+          }
+        }
+      });
+      kmlLayer.addTo(map);
+      document.getElementById('upload-status').textContent = `✅ KML loaded: ${count} titik dari ${file.name}`;
+    } catch(err) {
+      document.getElementById('upload-status').textContent = `❌ Error parsing KML: ${err.message}`;
+    }
+  };
+  reader.readAsText(file);
+};
+
+// ─────────────────── EXPORTS ───────────────────
+function getSurveyCoord(d) {
+  const adj = adjustments[d.id];
+  return adj ? {lat:adj.lat,lng:adj.lng,adj:true} : {lat:d.survey_lat,lng:d.survey_lng,adj:false};
+}
+
+function exportGeoJSON() {
+  const features = [];
+  ALL_DATA.forEach(d=>{
+    const s = getSurveyCoord(d);
+    if (!s.lat && !d.ref_lat) return;
+    const dist = (s.lat && d.ref_lat) ? haversine(s.lat,s.lng,d.ref_lat,d.ref_lng) : null;
+    const props = {
+      id:d.id, nama_jalan:d.nama_jalan, kecamatan:d.kecamatan, jenis:d.jenis,
+      prioritas:d.prioritas, survey_lat:s.lat, survey_lng:s.lng,
+      ref_lat:d.ref_lat, ref_lng:d.ref_lng, offset_m:dist?Math.round(dist*100)/100:null,
+      adjusted:s.adj, action:actions[d.id]||'',
+      status:d.status, flag_krusial:d.flag_krusial
+    };
+    if (s.lat) {
+      features.push({type:'Feature',geometry:{type:'Point',coordinates:[s.lng,s.lat]},properties:{...props,geom_type:'survey_point'}});
+    }
+    if (s.lat && d.ref_lat) {
+      features.push({type:'Feature',geometry:{type:'LineString',coordinates:[[s.lng,s.lat],[d.ref_lng,d.ref_lat]]},properties:{...props,geom_type:'offset_line'}});
+    }
+  });
+  download('reklame_batam.geojson', JSON.stringify({type:'FeatureCollection',features},null,2), 'application/json');
+}
+
+function exportCSV() {
+  const cols = ['id','id_lama','nama_jalan','kecamatan','kelurahan','jenis','tipe','tipe_jalan',
+    'prioritas','skor_final','pola_ruang',
+    'survey_lat_adj','survey_lng_adj','ref_lat','ref_lng','offset_m','adjusted',
+    'flag_krusial','kemiringan','status','tim_id','surveyor','tgl_survey',
+    'kondisi_lahan','visibilitas_jalan','catatan',
+    'tier_lokasi','format_reklame','harga_sewa','status_sewa',
+    'keputusan_koordinator','keputusan_gis','action'];
+  const rows = [cols.join(',')];
+  ALL_DATA.forEach(d=>{
+    const s = getSurveyCoord(d);
+    const dist = (s.lat && d.ref_lat) ? haversine(s.lat,s.lng,d.ref_lat,d.ref_lng).toFixed(2) : '';
+    const vals = [
+      d.id,d.id_lama,d.nama_jalan,d.kecamatan,d.kelurahan,d.jenis,d.tipe,d.tipe_jalan,
+      d.prioritas,d.skor_final,d.pola_ruang,
+      s.lat||'',s.lng||'',d.ref_lat||'',d.ref_lng||'',dist,s.adj?'Ya':'',
+      d.flag_krusial,d.kemiringan,d.status,d.tim_id,d.surveyor,d.tgl_survey,
+      d.kondisi_lahan,d.visibilitas_jalan,d.catatan,
+      d.tier_lokasi,d.format_reklame,d.harga_sewa,d.status_sewa,
+      d.keputusan_koordinator,d.keputusan_gis,actions[d.id]||''
+    ].map(v=>csvCell(v));
+    rows.push(vals.join(','));
+  });
+  download('reklame_batam_lengkap.csv', rows.join('\n'), 'text/csv');
+}
+
+function exportActionCSV() {
+  const cols = ['id','id_lama','nama_jalan','kecamatan','kelurahan','jenis','prioritas',
+    'lat_final','lng_final','ref_lat','ref_lng','offset_m','digeser',
+    'action','flag_krusial','status'];
+  const rows = [cols.join(',')];
+  ALL_DATA.forEach(d=>{
+    const s = getSurveyCoord(d);
+    const dist = (s.lat && d.ref_lat) ? haversine(s.lat,s.lng,d.ref_lat,d.ref_lng).toFixed(2) : '';
+    const shifted = dist && parseFloat(dist) > 5;
+    const vals = [
+      d.id, d.id_lama, d.nama_jalan, d.kecamatan, d.kelurahan, d.jenis, d.prioritas,
+      s.lat||'', s.lng||'', d.ref_lat||'', d.ref_lng||'',
+      dist, shifted ? 'DIGESER' : '', actions[d.id]||'BELUM_DITENTUKAN',
+      d.flag_krusial, d.status
+    ].map(v=>csvCell(v));
+    rows.push(vals.join(','));
+  });
+  download('reklame_batam_action_plan.csv', rows.join('\n'), 'text/csv');
+}
+
+function csvCell(v) {
+  if (v===null||v===undefined) return '';
+  const s = String(v).replace(/\r?\n/g,' ');
+  return (s.includes(',') || s.includes('"') || s.includes('\n')) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+
+function download(fname, content, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\uFEFF'+content],{type:mime+';charset=utf-8'}));
+  a.download = fname;
+  a.click();
+}
+
+// ─────────────────── STATS ───────────────────
+function updateStats() {
+  const filt = getFiltered();
+  document.getElementById('s-total').textContent = ALL_DATA.length;
+  document.getElementById('s-survey').textContent = ALL_DATA.filter(d=>d.survey_lat).length;
+  const shifted = ALL_DATA.filter(d=>{
+    if (!d.survey_lat || !d.ref_lat) return false;
+    const adj = adjustments[d.id];
+    const sLat = adj?adj.lat:d.survey_lat, sLng=adj?adj.lng:d.survey_lng;
+    return haversine(sLat,sLng,d.ref_lat,d.ref_lng) > 5;
+  }).length;
+  document.getElementById('s-shift').textContent = shifted;
+  document.getElementById('s-vis').textContent = filt.length;
+}
+
+// ─────────────────── HELPERS ───────────────────
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371000, p1=lat1*Math.PI/180, p2=lat2*Math.PI/180;
+  const dp=(lat2-lat1)*Math.PI/180, dl=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function badgePrioritas(p) {
+  if (!p) return '';
+  const cls = p.includes('1')?'b-p1':p.includes('2')?'b-p2':'b-p3';
+  return `<span class="badge ${cls}">${p}</span>`;
+}
+
+function saveActions() {
+  localStorage.setItem('reklame_actions', JSON.stringify(actions));
+}
+function saveAdjustments() {
+  localStorage.setItem('reklame_adj', JSON.stringify(adjustments));
+}
+
+// ─────────────────── LIGHTBOX ───────────────────
+function openLightbox(url, cap) {
+  document.getElementById('lb-img').src = url;
+  document.getElementById('lightbox-cap').textContent = cap||'';
+  document.getElementById('lightbox').style.display = 'flex';
+}
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeLightbox(); });
+
+// ─────────────────── SIDEBAR TOGGLE ───────────────────
+const tsb = document.getElementById('toggle-sidebar');
+const sb = document.getElementById('sidebar');
+tsb.onclick = ()=>{
+  sb.classList.toggle('collapsed');
+  tsb.style.left = sb.classList.contains('collapsed') ? '4px' : '344px';
+  tsb.textContent = sb.classList.contains('collapsed') ? '›' : '‹';
+};
+</script>
+</body>
+</html>
