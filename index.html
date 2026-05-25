@@ -519,9 +519,12 @@ fetch('data/survey_data.json')
     ALL_DATA = data;
     // Load actions dari cloud (GitHub Gist) lalu fallback localStorage
     buildFilters();
+    // Load localStorage dulu (instant), lalu cloud di background
     loadActionsFromCloud().then(() => {
       renderAll();
       updateStats();
+      // Auto-sync cloud setiap 30 detik (update dari browser lain)
+      setInterval(_syncFromCloud, 30000);
     });
   })
   .catch(e=>console.error('Data load error:',e));
@@ -1246,47 +1249,67 @@ async function saveActionsToCloud() {
 }
 
 async function loadActionsFromCloud() {
-  // Tampilkan loading
-  showSaveIndicator('saving');
-  document.getElementById('save-text').textContent = 'Memuat data...';
-  document.getElementById('save-indicator').classList.add('show');
+  // STALE-WHILE-REVALIDATE:
+  // 1. Tampil localStorage dulu (instant, 0ms)
+  // 2. Fetch cloud di background
+  // 3. Jika cloud berbeda → update + re-render
 
-  // Coba load dari cloud dulu
-  try {
-    const gistId = await getOrCreateGist();
-    if (gistId) {
-      const r = await fetch(`https://api.github.com/gists/${gistId}`, {
-        headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
-      });
-      if (r.ok) {
-        const data = await r.json();
-        const content = data.files[GIST_FILENAME]?.content;
-        if (content) {
-          const parsed = JSON.parse(content);
-          actions     = parsed.actions     || {};
-          adjustments = parsed.adjustments || {};
-          // Sync ke localStorage juga
-          localStorage.setItem('reklame_actions', JSON.stringify(actions));
-          localStorage.setItem('reklame_adj',     JSON.stringify(adjustments));
-          const upd = parsed.updatedAt ? new Date(parsed.updatedAt).toLocaleString('id-ID') : '-';
-          console.log(`Cloud loaded: ${Object.keys(actions).length} actions, updated ${upd}`);
-          showSaveIndicator('saved');
-          document.getElementById('save-text').textContent = `Data dimuat (${upd})`;
-          setTimeout(() => document.getElementById('save-indicator').classList.remove('show'), 3000);
-          return;
-        }
-      }
-    }
-  } catch(e) {
-    console.warn('Cloud load failed, using localStorage:', e.message);
-  }
-
-  // Fallback: localStorage
   try {
     actions     = JSON.parse(localStorage.getItem('reklame_actions') || '{}');
     adjustments = JSON.parse(localStorage.getItem('reklame_adj')     || '{}');
   } catch(e) {}
-  document.getElementById('save-indicator').classList.remove('show');
+
+  // Background sync dari cloud (tidak block render)
+  _syncFromCloud();
+}
+
+async function _syncFromCloud() {
+  try {
+    const gistId = await getOrCreateGist();
+    if (!gistId) return;
+
+    const r = await fetch(`https://api.github.com/gists/${gistId}`, {
+      headers: { 'Authorization': `token ${GITHUB_TOKEN}` },
+      cache: 'no-store'
+    });
+    if (!r.ok) return;
+
+    const data = await r.json();
+    const content = data.files[GIST_FILENAME]?.content;
+    if (!content) return;
+
+    const parsed = JSON.parse(content);
+    const cloudActions = parsed.actions || {};
+    const cloudAdj     = parsed.adjustments || {};
+
+    // Cek apakah ada perbedaan dengan yang sudah di-render
+    const localStr = JSON.stringify(actions);
+    const cloudStr = JSON.stringify(cloudActions);
+    if (localStr === cloudStr) return; // tidak ada perubahan, skip re-render
+
+    // Ada perubahan dari browser lain — update dan re-render
+    actions     = cloudActions;
+    adjustments = cloudAdj;
+    localStorage.setItem('reklame_actions', JSON.stringify(actions));
+    localStorage.setItem('reklame_adj',     JSON.stringify(adjustments));
+
+    const upd = parsed.updatedAt ? new Date(parsed.updatedAt).toLocaleString('id-ID') : '';
+    console.log(`Cloud sync: ${Object.keys(actions).length} actions updated ${upd}`);
+
+    // Re-render semua marker dan tabel
+    renderAll();
+    if (document.getElementById('table-panel').classList.contains('show')) renderTable();
+
+    // Tampilkan notif singkat
+    const si = document.getElementById('save-indicator');
+    const st = document.getElementById('save-text');
+    si.className = 'show saved';
+    st.textContent = `Disinkron dari cloud ✓`;
+    setTimeout(() => si.className = '', 2500);
+
+  } catch(e) {
+    console.warn('Background sync failed:', e.message);
+  }
 }
 
 function saveActions() {
