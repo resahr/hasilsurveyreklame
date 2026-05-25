@@ -943,9 +943,8 @@ Kamu bisa mengubah keputusan ini kapan saja.`,
         saveActionsAuto();
         updateMarkerIcon(activeId);
         openDetail(activeId);
-        // Update sidebar badge
-        const item = document.querySelector(`.feat-item[data-id="${activeId}"]`);
-        if (item) { const b = item.querySelector('.feat-badges'); if(b) { const fb=b.querySelector('.b-fix,.b-del'); if(fb) fb.remove(); b.insertAdjacentHTML('beforeend','<span class="badge b-fix">Fix</span>'); } }
+        renderAll();
+        if (document.getElementById('table-panel').classList.contains('show')) renderTable();
       }
     );
   }
@@ -973,9 +972,8 @@ Kamu bisa membatalkan keputusan ini kapan saja melalui tabel.`,
         saveActionsAuto();
         updateMarkerIcon(activeId);
         openDetail(activeId);
-        // Update sidebar badge
-        const item = document.querySelector(`.feat-item[data-id="${activeId}"]`);
-        if (item) { const b = item.querySelector('.feat-badges'); if(b) { const fb=b.querySelector('.b-fix,.b-del'); if(fb) fb.remove(); b.insertAdjacentHTML('beforeend','<span class="badge b-del">Hapus</span>'); } }
+        renderAll();
+        if (document.getElementById('table-panel').classList.contains('show')) renderTable();
       }
     );
   }
@@ -1466,6 +1464,10 @@ function saveActionsAuto() {
   localStorage.setItem('reklame_adj', JSON.stringify(adjustments));
   setTimeout(()=>showSaveIndicator('saved'), 300);
   updateTableCounts();
+  // Re-render tabel jika sedang terbuka
+  if (document.getElementById('table-panel')?.classList.contains('show')) {
+    renderTable();
+  }
 }
 
 function saveActions() {
@@ -1480,6 +1482,9 @@ function saveAdjustments() {
 let _currentTab = 'fix';
 
 function openTable() {
+  _currentTab = 'fix';
+  document.querySelectorAll('.tbl-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.tab-fix').classList.add('active');
   updateTableCounts();
   renderTable();
   document.getElementById('table-panel').classList.add('show');
@@ -1595,10 +1600,10 @@ Kamu bisa mengubah keputusan ini kapan saja.`,
     () => {
       actions[id] = act;
       saveActionsAuto();
-      renderTable();
-      updateTableCounts();
-      if (activeId === id) openDetail(id);
+      updateMarkerIcon(id);
       renderAll();
+      renderTable();
+      if (activeId === id) openDetail(id);
     }
   );
 }
