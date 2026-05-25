@@ -886,8 +886,10 @@ function closeConfirm() {
   _confirmCallback = null;
 }
 function confirmAction() {
+  // Simpan callback SEBELUM closeConfirm() yang akan null-kan _confirmCallback
+  const cb = _confirmCallback;
   closeConfirm();
-  if (_confirmCallback) _confirmCallback();
+  if (cb) cb();
 }
 // Klik di luar box → tutup
 document.getElementById('confirm-modal').addEventListener('click', function(e) {
