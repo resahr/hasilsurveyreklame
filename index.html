@@ -961,7 +961,7 @@ function showLabels() {
     const lat = adj ? adj.lat : d.survey_lat;
     const lng = adj ? adj.lng : d.survey_lng;
     if (!lat || !lng) return;
-    const shortId = d.id.split('-').slice(-2).join('-'); // ambil 2 bagian terakhir
+    const shortId = d.id;
     const m = L.marker([lat, lng], {
       icon: L.divIcon({
         html: `<div style="
