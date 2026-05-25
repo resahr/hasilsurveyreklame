@@ -896,70 +896,38 @@ document.getElementById('confirm-modal').addEventListener('click', function(e) {
 
 document.getElementById('act-fix').onclick = ()=>{
   if (!activeId) return;
-  const cur = actions[activeId];
-  if (cur === 'fix') {
-    // Sudah fix → undo langsung tanpa konfirmasi
-    actions[activeId] = '';
-    saveActionsAuto();
-    openDetail(activeId);
-    renderAll();
+  const cid = activeId;
+  if (actions[cid] === 'fix') {
+    actions[cid] = ''; saveActionsAuto(); updateMarkerIcon(cid); openDetail(cid); renderAll();
   } else {
-    const d = ALL_DATA.find(x=>x.id===activeId);
-    showConfirm(
-      '✅ Jadikan Titik Fix?',
-      `Titik ${activeId}${d?.nama_jalan?' — '+d.nama_jalan:''} akan ditandai sebagai TITIK FIX.
-
-Kamu bisa mengubah keputusan ini kapan saja.`,
-      'Ya, Titik Fix',
-      'confirm-yes-fix',
-      ()=>{
-        actions[activeId] = 'fix';
-        saveActionsAuto();
-        updateMarkerIcon(activeId);
-        openDetail(activeId);
-        renderAll();
-        if (document.getElementById('table-panel').classList.contains('show')) renderTable();
-      }
+    const d = ALL_DATA.find(x=>x.id===cid);
+    showConfirm('✅ Jadikan Titik Fix?',
+      `Titik ${cid}${d?.nama_jalan?' — '+d.nama_jalan:''} akan ditandai TITIK FIX.`,
+      'Ya, Titik Fix','confirm-yes-fix',
+      ()=>{ actions[cid]='fix'; saveActionsAuto(); updateMarkerIcon(cid); openDetail(cid); renderAll(); if(document.getElementById('table-panel').classList.contains('show'))renderTable(); }
     );
   }
 };
 
 document.getElementById('act-del').onclick = ()=>{
   if (!activeId) return;
-  const cur = actions[activeId];
-  if (cur === 'hapus') {
-    actions[activeId] = '';
-    saveActionsAuto();
-    openDetail(activeId);
-    renderAll();
+  const cid = activeId;
+  if (actions[cid] === 'hapus') {
+    actions[cid] = ''; saveActionsAuto(); updateMarkerIcon(cid); openDetail(cid); renderAll();
   } else {
-    const d = ALL_DATA.find(x=>x.id===activeId);
-    showConfirm(
-      '🗑 Hapus Titik Ini?',
-      `Titik ${activeId}${d?.nama_jalan?' — '+d.nama_jalan:''} akan ditandai DIHAPUS.
-
-Kamu bisa membatalkan keputusan ini kapan saja melalui tabel.`,
-      'Ya, Hapus',
-      'confirm-yes-del',
-      ()=>{
-        actions[activeId] = 'hapus';
-        saveActionsAuto();
-        updateMarkerIcon(activeId);
-        openDetail(activeId);
-        renderAll();
-        if (document.getElementById('table-panel').classList.contains('show')) renderTable();
-      }
+    const d = ALL_DATA.find(x=>x.id===cid);
+    showConfirm('🗑 Hapus Titik Ini?',
+      `Titik ${cid}${d?.nama_jalan?' — '+d.nama_jalan:''} akan ditandai DIHAPUS.`,
+      'Ya, Hapus','confirm-yes-del',
+      ()=>{ actions[cid]='hapus'; saveActionsAuto(); updateMarkerIcon(cid); openDetail(cid); renderAll(); if(document.getElementById('table-panel').classList.contains('show'))renderTable(); }
     );
   }
 };
 
 document.getElementById('act-reset-one').onclick = ()=>{
   if (!activeId) return;
-  actions[activeId] = '';
-  saveActionsAuto();
-  updateMarkerIcon(activeId);
-  openDetail(activeId);
-  renderAll();
+  const cid = activeId;
+  actions[cid]=''; saveActionsAuto(); updateMarkerIcon(cid); openDetail(cid); renderAll();
 };
 
 // ─────────────────── LAYER TOGGLES ───────────────────
