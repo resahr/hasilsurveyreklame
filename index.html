@@ -1103,21 +1103,20 @@ function exportGeoJSON() {
 function exportCSV() {
   const cols = ['id','id_lama','nama_jalan','kecamatan','kelurahan','jenis','tipe','tipe_jalan',
     'prioritas','skor_final','pola_ruang',
-    'survey_lat_adj','survey_lng_adj','ref_lat','ref_lng','offset_m','adjusted',
+    'survey_lat','survey_lng','ref_lat','ref_lng',
     'flag_krusial','kemiringan','status','tim_id','surveyor','tgl_survey',
-    'kondisi_lahan','visibilitas_jalan','catatan',
+    'catatan_lapangan','keterangan_lengkap',
     'tier_lokasi','format_reklame','harga_sewa','status_sewa',
-    'keputusan_koordinator','keputusan_gis','action'];
+    'keputusan_koordinator','keputusan_gis','action_plan'];
   const rows = [cols.join(',')];
   ALL_DATA.forEach(d=>{
     const s = getSurveyCoord(d);
-    const dist = (s.lat && d.ref_lat) ? haversine(s.lat,s.lng,d.ref_lat,d.ref_lng).toFixed(2) : '';
     const vals = [
       d.id,d.id_lama,d.nama_jalan,d.kecamatan,d.kelurahan,d.jenis,d.tipe,d.tipe_jalan,
       d.prioritas,d.skor_final,d.pola_ruang,
-      s.lat||'',s.lng||'',d.ref_lat||'',d.ref_lng||'',dist,s.adj?'Ya':'',
+      s.lat||'',s.lng||'',d.ref_lat||'',d.ref_lng||'',
       d.flag_krusial,d.kemiringan,d.status,d.tim_id,d.surveyor,d.tgl_survey,
-      d.kondisi_lahan,d.visibilitas_jalan,d.catatan,
+      d.catatan,d.keterangan_lengkap,
       d.tier_lokasi,d.format_reklame,d.harga_sewa,d.status_sewa,
       d.keputusan_koordinator,d.keputusan_gis,actions[d.id]||''
     ].map(v=>csvCell(v));
@@ -1127,19 +1126,17 @@ function exportCSV() {
 }
 
 function exportActionCSV() {
-  const cols = ['id','id_lama','nama_jalan','kecamatan','kelurahan','jenis','prioritas',
-    'lat_final','lng_final','ref_lat','ref_lng','offset_m','digeser',
-    'action','flag_krusial','status'];
+  const cols = ['id','id_lama','nama_jalan','kecamatan','kelurahan','jenis','tipe_jalan',
+    'prioritas','flag_krusial','survey_lat','survey_lng','ref_lat','ref_lng',
+    'keterangan_lengkap','action_plan','status'];
   const rows = [cols.join(',')];
   ALL_DATA.forEach(d=>{
     const s = getSurveyCoord(d);
-    const dist = (s.lat && d.ref_lat) ? haversine(s.lat,s.lng,d.ref_lat,d.ref_lng).toFixed(2) : '';
-    const shifted = dist && parseFloat(dist) > 5;
     const vals = [
-      d.id, d.id_lama, d.nama_jalan, d.kecamatan, d.kelurahan, d.jenis, d.prioritas,
+      d.id, d.id_lama, d.nama_jalan, d.kecamatan, d.kelurahan, d.jenis, d.tipe_jalan,
+      d.prioritas, d.flag_krusial,
       s.lat||'', s.lng||'', d.ref_lat||'', d.ref_lng||'',
-      dist, shifted ? 'DIGESER' : '', actions[d.id]||'BELUM_DITENTUKAN',
-      d.flag_krusial, d.status
+      d.keterangan_lengkap, actions[d.id]||'BELUM_DITENTUKAN', d.status
     ].map(v=>csvCell(v));
     rows.push(vals.join(','));
   });
@@ -1450,7 +1447,7 @@ function renderTable() {
     const dist = (sLat && d.ref_lat) ? haversine(sLat,sLng,d.ref_lat,d.ref_lng) : null;
     const shifted = dist && dist > 5;
 
-    const keterangan = d.catatan || '–';
+    const keterangan = d.keterangan_lengkap || d.catatan || '–';
 
     const actBadge = act==='fix'
       ? `<span class="badge-fix">✅ FIX</span>`
