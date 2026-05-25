@@ -587,7 +587,13 @@ function buildCBList(id, vals) {
 
 // ─────────────────── RENDER ───────────────────
 function renderAll() {
-  // clear
+  // Simpan state visibility layer sebelum clear
+  const lyrSurveyOn = document.getElementById('lyr-survey')?.checked !== false;
+  const lyrRefOn    = document.getElementById('lyr-ref')?.checked !== false;
+  const lyrLinesOn  = document.getElementById('lyr-lines')?.checked !== false;
+  const lyrUnsurvOn = document.getElementById('lyr-unsurv')?.checked !== false;
+
+  // clear semua layer
   clusterSurvey.clearLayers();
   clusterUnsurv.clearLayers();
   layerRef.clearLayers();
@@ -674,6 +680,20 @@ function renderAll() {
   });
 
   document.getElementById('list-count').textContent = filtered.length;
+
+  // Re-apply layer visibility state
+  if (lyrSurveyOn) { if (!map.hasLayer(clusterSurvey)) map.addLayer(clusterSurvey); }
+  else { if (map.hasLayer(clusterSurvey)) map.removeLayer(clusterSurvey); }
+  if (lyrRefOn)    { if (!map.hasLayer(layerRef)) map.addLayer(layerRef); }
+  else { if (map.hasLayer(layerRef)) map.removeLayer(layerRef); }
+  if (lyrLinesOn)  { if (!map.hasLayer(layerLines)) map.addLayer(layerLines); }
+  else { if (map.hasLayer(layerLines)) map.removeLayer(layerLines); }
+  if (lyrUnsurvOn) { if (!map.hasLayer(clusterUnsurv)) map.addLayer(clusterUnsurv); }
+  else { if (map.hasLayer(clusterUnsurv)) map.removeLayer(clusterUnsurv); }
+
+  // Force cluster refresh agar icon action plan ter-update
+  clusterSurvey.refreshClusters();
+
   updateStats();
   updateTableCounts();
 }
@@ -689,8 +709,9 @@ function updateLine(id) {
   }
   if (markers[id]?.survey) {
     markers[id].survey.setLatLng([sLat,sLng]);
-    const dist = haversine(sLat,sLng,d.ref_lat,d.ref_lng);
+    const dist = (d.ref_lat) ? haversine(sLat,sLng,d.ref_lat,d.ref_lng) : 0;
     markers[id].survey.setIcon(surveyIcon(dist>5, actions[id]||''));
+    clusterSurvey.refreshClusters(markers[id].survey);
   }
 }
 
@@ -920,8 +941,11 @@ Kamu bisa mengubah keputusan ini kapan saja.`,
       ()=>{
         actions[activeId] = 'fix';
         saveActionsAuto();
+        updateMarkerIcon(activeId);
         openDetail(activeId);
-        renderAll();
+        // Update sidebar badge
+        const item = document.querySelector(`.feat-item[data-id="${activeId}"]`);
+        if (item) { const b = item.querySelector('.feat-badges'); if(b) { const fb=b.querySelector('.b-fix,.b-del'); if(fb) fb.remove(); b.insertAdjacentHTML('beforeend','<span class="badge b-fix">Fix</span>'); } }
       }
     );
   }
@@ -947,8 +971,11 @@ Kamu bisa membatalkan keputusan ini kapan saja melalui tabel.`,
       ()=>{
         actions[activeId] = 'hapus';
         saveActionsAuto();
+        updateMarkerIcon(activeId);
         openDetail(activeId);
-        renderAll();
+        // Update sidebar badge
+        const item = document.querySelector(`.feat-item[data-id="${activeId}"]`);
+        if (item) { const b = item.querySelector('.feat-badges'); if(b) { const fb=b.querySelector('.b-fix,.b-del'); if(fb) fb.remove(); b.insertAdjacentHTML('beforeend','<span class="badge b-del">Hapus</span>'); } }
       }
     );
   }
@@ -958,6 +985,7 @@ document.getElementById('act-reset-one').onclick = ()=>{
   if (!activeId) return;
   actions[activeId] = '';
   saveActionsAuto();
+  updateMarkerIcon(activeId);
   openDetail(activeId);
   renderAll();
 };
@@ -1404,6 +1432,19 @@ function badgePrioritas(p) {
   if (!p) return '';
   const cls = p.includes('1')?'b-p1':p.includes('2')?'b-p2':'b-p3';
   return `<span class="badge ${cls}">${p}</span>`;
+}
+
+// Update icon marker tertentu saja (tanpa full re-render)
+function updateMarkerIcon(id) {
+  if (!markers[id]?.survey) return;
+  const d = ALL_DATA.find(x=>x.id===id);
+  if (!d) return;
+  const adj = adjustments[id];
+  const sLat = adj ? adj.lat : d.survey_lat;
+  const sLng = adj ? adj.lng : d.survey_lng;
+  const dist = (sLat && d.ref_lat) ? haversine(sLat,sLng,d.ref_lat,d.ref_lng) : 0;
+  markers[id].survey.setIcon(surveyIcon(dist>5, actions[id]||''));
+  clusterSurvey.refreshClusters(markers[id].survey);
 }
 
 let _saveTimer = null;
