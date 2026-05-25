@@ -266,20 +266,13 @@ table.data-tbl tr:hover td{background:#161b27}
       <div class="filter-label">Jenis Titik</div>
       <div class="checkbox-list" id="f-jenis"></div>
     </div>
-    <div class="filter-group">
-      <div class="filter-label">Status Survei</div>
-      <div class="checkbox-list" id="f-status">
-        <label class="cb-item"><input type="checkbox" value="surveyed"> Sudah Survei</label>
-        <label class="cb-item"><input type="checkbox" value="unsurveyed"> Belum Survei</label>
-        <label class="cb-item"><input type="checkbox" value="shifted"> Digeser</label>
-      </div>
-    </div>
+
     <div class="filter-group">
       <div class="filter-label">Action Plan</div>
       <div class="checkbox-list" id="f-action">
-        <label class="cb-item"><input type="checkbox" value="fix"> Titik Fix</label>
-        <label class="cb-item"><input type="checkbox" value="hapus"> Hapus</label>
-        <label class="cb-item"><input type="checkbox" value=""> Belum Ditentukan</label>
+        <label class="cb-item active"><input type="checkbox" value="fix" checked> ✓ Titik Fix</label>
+        <label class="cb-item active"><input type="checkbox" value="hapus" checked> ✕ Hapus</label>
+        <label class="cb-item active"><input type="checkbox" value="" checked> Pending</label>
       </div>
     </div>
   </div>
@@ -305,9 +298,10 @@ table.data-tbl tr:hover td{background:#161b27}
   <div id="layer-ctrl">
     <h4>Layer</h4>
     <label class="lyr-row"><input type="checkbox" id="lyr-survey" checked> <span class="dot" style="background:#94a3b8;width:8px;height:8px"></span> Titik Survei</label>
-    <label class="lyr-row"><input type="checkbox" id="lyr-ref" checked> <span class="sq" style="background:#3b82f6"></span> Titik Referensi</label>
+    <label class="lyr-row"><input type="checkbox" id="lyr-ref" checked> <span class="sq" style="background:#1e40af;width:8px;height:8px;border:1px solid #3b82f6"></span> Titik Referensi</label>
     <label class="lyr-row"><input type="checkbox" id="lyr-lines" checked> <span class="ln" style="border-color:#a855f7"></span> Garis Offset</label>
     <label class="lyr-row"><input type="checkbox" id="lyr-unsurv" checked> <span class="dot" style="background:#374151;border:1px solid #6b7280;width:8px;height:8px"></span> Belum Survei</label>
+    <label class="lyr-row"><input type="checkbox" id="lyr-labels"> <span style="font-size:9px;background:#1e2d3d;color:#7dd3fc;padding:1px 4px;border-radius:3px;border:1px solid #3b82f6">ID</span> Label ID Titik</label>
     <hr style="border-color:var(--border);margin:7px 0">
     <h4>Basemap</h4>
     <label class="lyr-row"><input type="radio" name="basemap" value="dark" checked> Dark</label>
@@ -561,14 +555,13 @@ function buildFilters() {
   buildCBList('f-jenis', jen);
 }
 
-function buildCBList(id, vals) {
+function buildCBList(id, vals, defaultChecked=true) {
   const el = document.getElementById(id);
   el.innerHTML = '';
   vals.forEach(v=>{
     const lbl = document.createElement('label');
-    lbl.className = 'cb-item';
-    lbl.innerHTML = `<input type="checkbox" value="${v}"> ${v}`;
-    // Pasang listener langsung saat elemen dibuat
+    lbl.className = defaultChecked ? 'cb-item active' : 'cb-item';
+    lbl.innerHTML = `<input type="checkbox" value="${v}"${defaultChecked?' checked':''}> ${v}`;
     lbl.querySelector('input').addEventListener('change', function(){
       lbl.classList.toggle('active', this.checked);
       renderAll();
@@ -716,27 +709,21 @@ function getFiltered() {
   const kec = getFilterVals('f-kecamatan');
   const pri = getFilterVals('f-prioritas');
   const jen = getFilterVals('f-jenis');
-  const sts = getFilterVals('f-status');
   const act = getFilterVals('f-action');
+
+  // Cek total checkbox per group — jika semua checked atau semua unchecked = tampil semua
+  const kecAll = document.querySelectorAll('#f-kecamatan input').length;
+  const priAll = document.querySelectorAll('#f-prioritas input').length;
+  const jenAll = document.querySelectorAll('#f-jenis input').length;
+  const actAll = document.querySelectorAll('#f-action input').length;
 
   return ALL_DATA.filter(d=>{
     if (q && !d.id.toLowerCase().includes(q) && !(d.nama_jalan||'').toLowerCase().includes(q)) return false;
-    if (kec.length && !kec.includes(d.kecamatan)) return false;
-    if (pri.length && !pri.includes(d.prioritas)) return false;
-    if (jen.length && !jen.includes(d.jenis)) return false;
-    if (act.length && !act.includes(actions[d.id]||'')) return false;
-    if (sts.length) {
-      const has = d.survey_lat && d.survey_lng;
-      const adj = adjustments[d.id];
-      const sLat = adj?adj.lat:d.survey_lat, sLng=adj?adj.lng:d.survey_lng;
-      const dist = (has && d.ref_lat) ? haversine(sLat,sLng,d.ref_lat,d.ref_lng) : 0;
-      const shifted = dist > 5;
-      let pass = false;
-      if (sts.includes('surveyed') && has) pass = true;
-      if (sts.includes('unsurveyed') && !has) pass = true;
-      if (sts.includes('shifted') && shifted) pass = true;
-      if (!pass) return false;
-    }
+    // Jika tidak ada yang checked ATAU semua checked → tampil semua
+    if (kec.length > 0 && kec.length < kecAll && !kec.includes(d.kecamatan)) return false;
+    if (pri.length > 0 && pri.length < priAll && !pri.includes(d.prioritas)) return false;
+    if (jen.length > 0 && jen.length < jenAll && !jen.includes(d.jenis)) return false;
+    if (act.length > 0 && act.length < actAll && !act.includes(actions[d.id]||'')) return false;
     return true;
   });
 }
@@ -954,6 +941,64 @@ document.getElementById('lyr-survey').onchange = e=>e.target.checked?map.addLaye
 document.getElementById('lyr-ref').onchange = e=>e.target.checked?map.addLayer(layerRef):map.removeLayer(layerRef);
 document.getElementById('lyr-lines').onchange = e=>e.target.checked?map.addLayer(layerLines):map.removeLayer(layerLines);
 document.getElementById('lyr-unsurv').onchange = e=>e.target.checked?map.addLayer(clusterUnsurv):map.removeLayer(clusterUnsurv);
+
+// ── LABEL ID TOGGLE ──
+let labelLayer = null;
+document.getElementById('lyr-labels').onchange = function(e) {
+  if (e.target.checked) {
+    showLabels();
+  } else {
+    if (labelLayer) { map.removeLayer(labelLayer); labelLayer = null; }
+  }
+};
+
+function showLabels() {
+  if (labelLayer) { map.removeLayer(labelLayer); labelLayer = null; }
+  labelLayer = L.layerGroup();
+  const filtered = getFiltered();
+  filtered.forEach(d => {
+    const adj = adjustments[d.id];
+    const lat = adj ? adj.lat : d.survey_lat;
+    const lng = adj ? adj.lng : d.survey_lng;
+    if (!lat || !lng) return;
+    const shortId = d.id.split('-').slice(-2).join('-'); // ambil 2 bagian terakhir
+    const m = L.marker([lat, lng], {
+      icon: L.divIcon({
+        html: `<div style="
+          background:rgba(15,17,23,0.85);
+          color:#7dd3fc;
+          font-size:9px;
+          font-weight:600;
+          padding:1px 4px;
+          border-radius:3px;
+          border:1px solid #3b82f6;
+          white-space:nowrap;
+          pointer-events:none;
+          transform:translateY(-14px);
+          font-family:monospace;
+        ">${shortId}</div>`,
+        className: '',
+        iconSize: null,
+        iconAnchor: [0, 0]
+      }),
+      interactive: false,
+      zIndexOffset: -100
+    });
+    labelLayer.addLayer(m);
+  });
+  labelLayer.addTo(map);
+}
+
+// Re-render labels saat zoom berubah (agar tidak terlalu ramai saat zoom out)
+map.on('zoomend', () => {
+  if (document.getElementById('lyr-labels')?.checked) {
+    if (map.getZoom() < 14) {
+      if (labelLayer) { map.removeLayer(labelLayer); }
+    } else {
+      showLabels();
+    }
+  }
+});
 
 document.querySelectorAll('input[name="basemap"]').forEach(r=>{
   r.onchange = ()=>{
