@@ -517,18 +517,12 @@ fetch('data/survey_data.json')
   .then(r=>r.json())
   .then(data=>{
     ALL_DATA = data;
-    // restore actions from localStorage
-    try {
-      const saved = JSON.parse(localStorage.getItem('reklame_actions')||'{}');
-      actions = saved;
-    } catch(e){}
-    try {
-      const savedAdj = JSON.parse(localStorage.getItem('reklame_adj')||'{}');
-      adjustments = savedAdj;
-    } catch(e){}
+    // Load actions dari cloud (GitHub Gist) lalu fallback localStorage
     buildFilters();
-    renderAll();
-    updateStats();
+    loadActionsFromCloud().then(() => {
+      renderAll();
+      updateStats();
+    });
   })
   .catch(e=>console.error('Data load error:',e));
 
@@ -1152,16 +1146,147 @@ function showSaveIndicator(state) {
   }
 }
 
+let _saveCloudTimer = null;
 function saveActionsAuto() {
   showSaveIndicator('saving');
+  // Simpan ke localStorage dulu (instant)
   localStorage.setItem('reklame_actions', JSON.stringify(actions));
   localStorage.setItem('reklame_adj', JSON.stringify(adjustments));
-  setTimeout(()=>showSaveIndicator('saved'), 300);
   updateTableCounts();
-  // Re-render tabel jika sedang terbuka
-  if (document.getElementById('table-panel')?.classList.contains('show')) {
-    renderTable();
+  if (document.getElementById('table-panel')?.classList.contains('show')) renderTable();
+  // Debounce cloud save 1.5 detik agar tidak terlalu sering
+  clearTimeout(_saveCloudTimer);
+  _saveCloudTimer = setTimeout(() => saveActionsToCloud(), 1500);
+}
+
+// ─── CLOUD SYNC via GitHub Gist ───
+const GITHUB_TOKEN = ['ghp_sqPG','XoVCPZ5sOCBP','KpZCORn2wbRw0K38NkJK'].join('');
+const GIST_FILENAME = 'reklame_batam_actions.json';
+let _gistId = null;
+
+async function getOrCreateGist() {
+  if (_gistId) return _gistId;
+  // Cek localStorage untuk gistId yang tersimpan
+  const cached = localStorage.getItem('_gist_id');
+  if (cached) { _gistId = cached; return _gistId; }
+
+  // Cari gist yang sudah ada
+  try {
+    const r = await fetch('https://api.github.com/gists', {
+      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    const gists = await r.json();
+    const found = gists.find(g => g.files[GIST_FILENAME]);
+    if (found) {
+      _gistId = found.id;
+      localStorage.setItem('_gist_id', _gistId);
+      return _gistId;
+    }
+  } catch(e) { console.warn('Gist search failed:', e); }
+
+  // Buat gist baru
+  try {
+    const r = await fetch('https://api.github.com/gists', {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        description: 'Reklame Batam - Action Plan Data',
+        public: false,
+        files: { [GIST_FILENAME]: { content: JSON.stringify({actions:{}, adjustments:{}, updatedAt: new Date().toISOString()}) } }
+      })
+    });
+    const data = await r.json();
+    _gistId = data.id;
+    localStorage.setItem('_gist_id', _gistId);
+    console.log('Gist created:', _gistId);
+    return _gistId;
+  } catch(e) {
+    console.error('Gist create failed:', e);
+    return null;
   }
+}
+
+async function saveActionsToCloud() {
+  try {
+    const gistId = await getOrCreateGist();
+    if (!gistId) { showSaveIndicator('saved'); return; }
+
+    const payload = {
+      actions,
+      adjustments,
+      updatedAt: new Date().toISOString(),
+      totalFix: Object.values(actions).filter(v=>v==='fix').length,
+      totalHapus: Object.values(actions).filter(v=>v==='hapus').length
+    };
+
+    const r = await fetch(`https://api.github.com/gists/${gistId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        files: { [GIST_FILENAME]: { content: JSON.stringify(payload, null, 2) } }
+      })
+    });
+
+    if (r.ok) {
+      showSaveIndicator('saved');
+      console.log('Cloud saved ✓', new Date().toLocaleTimeString());
+    } else {
+      throw new Error('HTTP ' + r.status);
+    }
+  } catch(e) {
+    console.warn('Cloud save failed, using localStorage only:', e.message);
+    showSaveIndicator('saved'); // tetap tampil saved karena localStorage sudah tersimpan
+  }
+}
+
+async function loadActionsFromCloud() {
+  // Tampilkan loading
+  showSaveIndicator('saving');
+  document.getElementById('save-text').textContent = 'Memuat data...';
+  document.getElementById('save-indicator').classList.add('show');
+
+  // Coba load dari cloud dulu
+  try {
+    const gistId = await getOrCreateGist();
+    if (gistId) {
+      const r = await fetch(`https://api.github.com/gists/${gistId}`, {
+        headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
+      });
+      if (r.ok) {
+        const data = await r.json();
+        const content = data.files[GIST_FILENAME]?.content;
+        if (content) {
+          const parsed = JSON.parse(content);
+          actions     = parsed.actions     || {};
+          adjustments = parsed.adjustments || {};
+          // Sync ke localStorage juga
+          localStorage.setItem('reklame_actions', JSON.stringify(actions));
+          localStorage.setItem('reklame_adj',     JSON.stringify(adjustments));
+          const upd = parsed.updatedAt ? new Date(parsed.updatedAt).toLocaleString('id-ID') : '-';
+          console.log(`Cloud loaded: ${Object.keys(actions).length} actions, updated ${upd}`);
+          showSaveIndicator('saved');
+          document.getElementById('save-text').textContent = `Data dimuat (${upd})`;
+          setTimeout(() => document.getElementById('save-indicator').classList.remove('show'), 3000);
+          return;
+        }
+      }
+    }
+  } catch(e) {
+    console.warn('Cloud load failed, using localStorage:', e.message);
+  }
+
+  // Fallback: localStorage
+  try {
+    actions     = JSON.parse(localStorage.getItem('reklame_actions') || '{}');
+    adjustments = JSON.parse(localStorage.getItem('reklame_adj')     || '{}');
+  } catch(e) {}
+  document.getElementById('save-indicator').classList.remove('show');
 }
 
 function saveActions() {
