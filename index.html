@@ -295,7 +295,7 @@ table.data-tbl tr:hover td{background:#161b27}
   <div id="toolbar">
     <button class="tb-btn" id="btn-fit">🗺 Fit All</button>
     <div class="tb-sep"></div>
-    <button class="tb-btn" id="btn-upload">📤 Upload Basemap/KML</button>
+    <button class="tb-btn" id="btn-upload">📤 Upload KML/KMZ</button>
     <div class="tb-sep"></div>
     <button class="tb-btn" id="btn-reset-drag">↺ Reset Posisi</button>
     <div class="tb-sep"></div>
@@ -313,7 +313,6 @@ table.data-tbl tr:hover td{background:#161b27}
     <label class="lyr-row"><input type="radio" name="basemap" value="dark" checked> Dark</label>
     <label class="lyr-row"><input type="radio" name="basemap" value="osm"> OpenStreetMap</label>
     <label class="lyr-row"><input type="radio" name="basemap" value="sat"> Satellite</label>
-    <label class="lyr-row"><input type="radio" name="basemap" value="tiff"> 📸 Ortho (TIFF)</label>
   </div>
 
   <div id="detail">
@@ -348,35 +347,13 @@ table.data-tbl tr:hover td{background:#161b27}
 <!-- UPLOAD PANEL -->
 <div id="upload-panel">
   <button class="upl-close" onclick="document.getElementById('upload-panel').style.display='none'">✕</button>
-  <h3>Upload Basemap / Data Tambahan</h3>
-  <div class="upl-group">
-    <div class="upl-label">📡 URL Google Drive / COG (Direkomendasikan untuk TIF besar)</div>
-    <div style="display:flex;gap:5px;margin-bottom:4px">
-      <input type="text" id="tiff-url" placeholder="Paste sharing link Google Drive…"
-        style="flex:1;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;outline:none">
-      <button onclick="loadTiffFromUrl()" style="padding:6px 10px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-size:11px;cursor:pointer;font-weight:600;white-space:nowrap">▶ Load</button>
-    </div>
-    <div style="font-size:10px;color:var(--muted);line-height:1.4">
-      💡 <b>GitHub Release URL</b> (rekomendasi): upload file COG ke GitHub Release → paste URL di sini.<br>
-      <b>Google Drive</b>: pastikan share "Anyone with link" → paste sharing link.<br>
-      Untuk performa terbaik gunakan <b>COG (Cloud Optimized GeoTIFF)</b>.
-    </div>
-  </div>
-  <div class="upl-group" style="border-top:1px solid var(--border);padding-top:8px">
-    <div class="upl-label">📁 Upload File Lokal (PNG/JPG, atau TIF &lt;100MB)</div>
-    <input type="file" class="upl-input" id="upload-tiff" accept=".tif,.tiff,.png,.jpg">
-    <div style="font-size:10px;color:var(--muted);margin-top:3px">⚠ TIF besar akan sangat lambat di browser. Gunakan URL GDrive untuk file besar.</div>
-  </div>
+  <h3>Upload Data Tambahan</h3>
+
   <div class="upl-group" style="border-top:1px solid var(--border);padding-top:8px">
     <div class="upl-label">KML / KMZ (titik tambahan)</div>
     <input type="file" class="upl-input" id="upload-kml" accept=".kml,.kmz">
   </div>
   <div id="upload-status" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5"></div>
-  <div id="tiff-opacity-wrap" style="display:none;margin-top:10px">
-    <div class="upl-label">Opacity Ortho</div>
-    <input type="range" id="tiff-opacity" min="10" max="100" value="85" style="width:100%;accent-color:var(--accent)">
-    <div style="font-size:10px;color:var(--muted);text-align:right"><span id="tiff-opacity-val">85</span>%</div>
-  </div>
 </div>
 
 <!-- MODAL KONFIRMASI -->
@@ -471,25 +448,7 @@ table.data-tbl tr:hover td{background:#161b27}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
-<!-- GeoTIFF support via CDN dengan fallback -->
-<script>
-// Shim untuk CommonJS di browser
-window._module = { exports: {} };
-window._exports = window._module.exports;
-window._require = function(name) {
-  if (name === 'leaflet') return window.L;
-  if (name === 'chroma-js') return window.chroma || null;
-  return window[name] || null;
-};
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/geotiff.js/2.0.7/geotiff.bundle.min.js" crossorigin="anonymous"></script>
-<script>
-// Pastikan GeoTIFF/parseGeoraster tersedia setelah load
-if (typeof GeoTIFF !== 'undefined' && !window.parseGeoraster) {
-  // GeoTIFF.js loaded, parseGeoraster akan di-handle langsung
-  window._geotiffLoaded = true;
-}
-</script>
+
 <script>
 // ─────────────────── STATE ───────────────────
 let ALL_DATA = [];
@@ -498,7 +457,6 @@ let adjustments = {};    // id -> {lat, lng}
 let actions = {};        // id -> 'fix' | 'hapus' | ''
 let activeId = null;
 let kmlLayer = null;
-let tiffLayer = null;
 let clusterSurvey, clusterUnsurv, layerRef, layerLines;
 
 // ─────────────────── MAP INIT ───────────────────
@@ -1012,23 +970,8 @@ document.getElementById('lyr-unsurv').onchange = e=>e.target.checked?map.addLaye
 
 document.querySelectorAll('input[name="basemap"]').forEach(r=>{
   r.onchange = ()=>{
-    // Hapus semua basemap
     Object.values(basemaps).forEach(b => map.removeLayer(b));
-    if (tiffLayer) map.removeLayer(tiffLayer);
-
-    if (r.value === 'tiff') {
-      if (tiffLayer) {
-        tiffLayer.addTo(map);
-      } else {
-        // Belum ada TIFF — buka panel upload dan kembalikan ke dark
-        document.getElementById('upload-panel').style.display = 'block';
-        document.getElementById('upload-status').textContent = '⬆️ Upload file foto ortho/PNG di sini.';
-        basemaps.dark.addTo(map);
-        document.querySelector('input[name="basemap"][value="dark"]').checked = true;
-      }
-    } else if (basemaps[r.value]) {
-      basemaps[r.value].addTo(map);
-    }
+    if (basemaps[r.value]) basemaps[r.value].addTo(map);
   };
 });
 
@@ -1055,232 +998,6 @@ document.getElementById('btn-upload').onclick = ()=>{
 };
 
 // ─────────────────── LOAD TIFF FROM URL (Google Drive / COG) ───────────────────
-function gdriveDirect(url) {
-  // GitHub Release asset — sudah direct download
-  if (url.includes('github.com') && url.includes('/releases/download/')) return url;
-  if (url.includes('raw.githubusercontent.com')) return url;
-  // Google Drive
-  let fileId = null;
-  let m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if (m) fileId = m[1];
-  if (!fileId) { m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/); if(m) fileId = m[1]; }
-  if (fileId) return `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
-  return url;
-}
-
-async function loadTiffFromUrl() {
-  const rawUrl = document.getElementById('tiff-url').value.trim();
-  const statusEl = document.getElementById('upload-status');
-  if (!rawUrl) { statusEl.textContent = '⚠ Masukkan URL terlebih dahulu.'; return; }
-  if (tiffLayer) { map.removeLayer(tiffLayer); tiffLayer = null; }
-  document.getElementById('tiff-opacity-wrap').style.display = 'none';
-  statusEl.innerHTML = '⏳ Mengambil file... harap tunggu';
-
-  const PROXIES = [
-    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-    u => u
-  ];
-  const directUrl = gdriveDirect(rawUrl);
-  let arrayBuffer = null;
-
-  for (let i = 0; i < PROXIES.length; i++) {
-    const proxyUrl = PROXIES[i](directUrl);
-    try {
-      statusEl.innerHTML = `⏳ Download via ${i===0?'proxy':'direct'}...`;
-      const resp = await fetch(proxyUrl, {mode:'cors'});
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const total = parseInt(resp.headers.get('content-length')||0);
-      const reader = resp.body.getReader();
-      const chunks = []; let received = 0;
-      while(true) {
-        const {done,value} = await reader.read();
-        if (done) break;
-        chunks.push(value); received += value.length;
-        if (total) statusEl.innerHTML = `⏳ ${Math.round(received/total*100)}% (${Math.round(received/1048576)}/${Math.round(total/1048576)} MB)`;
-        else statusEl.innerHTML = `⏳ ${Math.round(received/1048576)} MB...`;
-      }
-      arrayBuffer = await new Blob(chunks).arrayBuffer();
-      break;
-    } catch(e) { console.warn('proxy',i,'failed:',e.message); }
-  }
-
-  if (!arrayBuffer) {
-    statusEl.innerHTML = `❌ Gagal download. Pastikan file bisa diakses publik.`;
-    return;
-  }
-
-  try {
-    statusEl.innerHTML = '⏳ Parsing GeoTIFF...';
-    const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
-    const image = await tiff.getImage();
-    const bbox = image.getBoundingBox(); // [minX, minY, maxX, maxY] dalam CRS file
-    const width = image.getWidth();
-    const height = image.getHeight();
-    const samplesPerPixel = image.getSamplesPerPixel();
-    
-    statusEl.innerHTML = `⏳ Rendering ${width}x${height} px...`;
-    
-    // Baca raster data
-    const data = await image.readRasters({interleave: true});
-    
-    // Render ke canvas
-    const canvas = document.createElement('canvas');
-    const scale = Math.min(4096/width, 4096/height, 1);
-    canvas.width  = Math.round(width  * scale);
-    canvas.height = Math.round(height * scale);
-    const ctx = canvas.getContext('2d');
-    const imgData = ctx.createImageData(canvas.width, canvas.height);
-    
-    for (let y = 0; y < canvas.height; y++) {
-      for (let x = 0; x < canvas.width; x++) {
-        const sx = Math.round(x/scale), sy = Math.round(y/scale);
-        const srcIdx = (sy * width + sx) * samplesPerPixel;
-        const dstIdx = (y * canvas.width + x) * 4;
-        if (samplesPerPixel >= 3) {
-          imgData.data[dstIdx]   = data[srcIdx];
-          imgData.data[dstIdx+1] = data[srcIdx+1];
-          imgData.data[dstIdx+2] = data[srcIdx+2];
-          imgData.data[dstIdx+3] = samplesPerPixel >= 4 ? data[srcIdx+3] : 255;
-        } else {
-          const v = data[srcIdx];
-          imgData.data[dstIdx] = imgData.data[dstIdx+1] = imgData.data[dstIdx+2] = v;
-          imgData.data[dstIdx+3] = 255;
-        }
-      }
-    }
-    ctx.putImageData(imgData, 0, 0);
-    
-    // Bounds: bbox dalam koordinat file (biasanya projected)
-    // Untuk GeoTIFF dengan EPSG:32648, konversi dari UTM ke LatLng
-    // Leaflet butuh LatLng bounds
-    let bounds;
-    const geoKeys = image.getGeoKeys();
-    const projCode = geoKeys?.ProjectedCSTypeGeoKey;
-    
-    // Jika ada metadata CRS, gunakan bounds langsung
-    // Asumsi file sudah WGS84 atau dekati Batam area
-    if (bbox[0] > -180 && bbox[0] < 180 && bbox[1] > -90 && bbox[1] < 90) {
-      // Sudah LatLng
-      bounds = [[bbox[1], bbox[0]], [bbox[3], bbox[2]]];
-    } else {
-      // Projected (UTM) - estimasi dari data survey bounds
-      const pts = ALL_DATA.filter(d=>d.ref_lat).map(d=>[d.ref_lat,d.ref_lng]);
-      if (pts.length) {
-        const lats = pts.map(p=>p[0]), lngs = pts.map(p=>p[1]);
-        bounds = [[Math.min(...lats)-0.01, Math.min(...lngs)-0.01],[Math.max(...lats)+0.01, Math.max(...lngs)+0.01]];
-      } else {
-        bounds = [[1.0, 103.9],[1.15, 104.15]];
-      }
-    }
-
-    tiffLayer = L.imageOverlay(canvas.toDataURL('image/png'), bounds, {opacity:0.85, interactive:false});
-    Object.values(basemaps).forEach(b => map.removeLayer(b));
-    tiffLayer.addTo(map);
-    map.fitBounds(bounds);
-    document.querySelectorAll('input[name="basemap"]').forEach(r => r.checked = r.value==='tiff');
-    document.getElementById('tiff-opacity-wrap').style.display = 'block';
-    statusEl.innerHTML = `✅ Ortho berhasil dimuat! (${width}x${height}px, ${samplesPerPixel} band)`;
-  } catch(err) {
-    statusEl.innerHTML = `❌ Error parse TIFF: ${err.message}`;
-    console.error(err);
-  }
-}
-
-// ─────────────────── UPLOAD TIFF ───────────────────
-document.getElementById('upload-tiff').onchange = function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const statusEl = document.getElementById('upload-status');
-  const isTiff = /\.(tif|tiff)$/i.test(file.name);
-
-  // Hapus layer lama
-  if (tiffLayer) { map.removeLayer(tiffLayer); tiffLayer = null; }
-
-  if (isTiff && typeof parseGeoraster !== 'undefined') {
-    // ── GeoTIFF georeferensi via georaster ──
-    statusEl.textContent = `⏳ Memuat GeoTIFF: ${file.name}…`;
-
-    const reader = new FileReader();
-    reader.onload = function(ev) {
-      parseGeoraster(ev.target.result).then(function(georaster) {
-        tiffLayer = new GeoRasterLayer({
-          georaster: georaster,
-          opacity: 0.85,
-          resolution: 256,
-          // Render sebagai RGB natural color
-          pixelValuesToColorFn: function(vals) {
-            // Jika single band (grayscale)
-            if (vals.length === 1) {
-              const v = Math.min(255, Math.max(0, vals[0]));
-              return `rgba(${v},${v},${v},1)`;
-            }
-            // Multi-band: ambil R,G,B (band 1,2,3)
-            const r = Math.min(255, Math.max(0, vals[0]));
-            const g = Math.min(255, Math.max(0, vals[1]));
-            const b = Math.min(255, Math.max(0, vals[2]));
-            // Skip nodata (biasanya 0,0,0 atau 255,255,255 di semua band)
-            if (r === 0 && g === 0 && b === 0) return null;
-            return `rgba(${r},${g},${b},1)`;
-          }
-        });
-
-        // Switch basemap
-        Object.values(basemaps).forEach(b => map.removeLayer(b));
-        tiffLayer.addTo(map);
-        map.fitBounds(tiffLayer.getBounds());
-
-        // Update radio button
-        document.querySelectorAll('input[name="basemap"]').forEach(r => r.checked = r.value === 'tiff');
-
-        const bounds = tiffLayer.getBounds();
-        statusEl.textContent = `✅ GeoTIFF berhasil dimuat: ${file.name} | Extent: ${bounds.getSouthWest().lat.toFixed(4)},${bounds.getSouthWest().lng.toFixed(4)} → ${bounds.getNorthEast().lat.toFixed(4)},${bounds.getNorthEast().lng.toFixed(4)}`;
-        document.getElementById('tiff-opacity-wrap').style.display = 'block';
-      }).catch(function(err) {
-        statusEl.textContent = `❌ Error membaca GeoTIFF: ${err.message}`;
-        console.error(err);
-      });
-    };
-    reader.onerror = () => { statusEl.textContent = '❌ Gagal membaca file.'; };
-    reader.readAsArrayBuffer(file);
-
-  } else if (!isTiff) {
-    // ── PNG / JPG — overlay dengan bounds dari data ──
-    const url = URL.createObjectURL(file);
-    const pts = [];
-    ALL_DATA.forEach(d => {
-      if (d.survey_lat) pts.push([d.survey_lat, d.survey_lng]);
-      if (d.ref_lat)    pts.push([d.ref_lat, d.ref_lng]);
-    });
-    let bounds;
-    if (pts.length) {
-      const lats = pts.map(p=>p[0]), lngs = pts.map(p=>p[1]);
-      const pLat = (Math.max(...lats)-Math.min(...lats))*0.02;
-      const pLng = (Math.max(...lngs)-Math.min(...lngs))*0.02;
-      bounds = [[Math.min(...lats)-pLat, Math.min(...lngs)-pLng],[Math.max(...lats)+pLat, Math.max(...lngs)+pLng]];
-    } else {
-      bounds = map.getBounds();
-    }
-    tiffLayer = L.imageOverlay(url, bounds, {opacity:0.85, interactive:false});
-    Object.values(basemaps).forEach(b => map.removeLayer(b));
-    tiffLayer.addTo(map);
-    map.fitBounds(bounds);
-    document.querySelectorAll('input[name="basemap"]').forEach(r => r.checked = r.value === 'tiff');
-    statusEl.textContent = `✅ ${file.name} tampil sebagai basemap ortho.`;
-    document.getElementById('tiff-opacity-wrap').style.display = 'block';
-
-  } else {
-    statusEl.textContent = '❌ Library GeoTIFF belum termuat. Coba refresh halaman.';
-  }
-};
-
-// Opacity slider untuk TIFF
-document.getElementById('tiff-opacity').oninput = function() {
-  const v = parseInt(this.value);
-  document.getElementById('tiff-opacity-val').textContent = v;
-  if (tiffLayer) tiffLayer.setOpacity(v/100);
-};
-
 // ─────────────────── UPLOAD KML ───────────────────
 document.getElementById('upload-kml').onchange = function(e) {
   const file = e.target.files[0];
