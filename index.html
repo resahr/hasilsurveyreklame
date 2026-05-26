@@ -1152,7 +1152,7 @@ function exportGeoJSON() {
 function exportCSV() {
   const cols = ['id','id_lama','nama_jalan','kecamatan','kelurahan','jenis','tipe','tipe_jalan',
     'prioritas','skor_final','pola_ruang',
-    'survey_lat','survey_lng','ref_lat','ref_lng',
+    'survey_lat','survey_lng','ref_lat','ref_lng','offset_m','digeser',
     'flag_krusial','kemiringan','status','tim_id','surveyor','tgl_survey',
     'catatan_lapangan','keterangan_lengkap',
     'tier_lokasi','format_reklame','harga_sewa','status_sewa',
@@ -1160,10 +1160,13 @@ function exportCSV() {
   const rows = [cols.join(',')];
   ALL_DATA.forEach(d=>{
     const s = getSurveyCoord(d);
+    const dist = (s.lat && d.ref_lat) ? haversine(s.lat,s.lng,d.ref_lat,d.ref_lng) : null;
+    const digeser = dist !== null ? (dist > 5 ? 'DIGESER' : '') : '';
     const vals = [
       d.id,d.id_lama,d.nama_jalan,d.kecamatan,d.kelurahan,d.jenis,d.tipe,d.tipe_jalan,
       d.prioritas,d.skor_final,d.pola_ruang,
       s.lat||'',s.lng||'',d.ref_lat||'',d.ref_lng||'',
+      dist ? dist.toFixed(2) : '', digeser,
       d.flag_krusial,d.kemiringan,d.status,d.tim_id,d.surveyor,d.tgl_survey,
       d.catatan,d.keterangan_lengkap,
       d.tier_lokasi,d.format_reklame,d.harga_sewa,d.status_sewa,
@@ -1177,14 +1180,17 @@ function exportCSV() {
 function exportActionCSV() {
   const cols = ['id','id_lama','nama_jalan','kecamatan','kelurahan','jenis','tipe_jalan',
     'prioritas','flag_krusial','survey_lat','survey_lng','ref_lat','ref_lng',
-    'keterangan_lengkap','action_plan','status'];
+    'offset_m','digeser','keterangan_lengkap','action_plan','status'];
   const rows = [cols.join(',')];
   ALL_DATA.forEach(d=>{
     const s = getSurveyCoord(d);
+    const dist = (s.lat && d.ref_lat) ? haversine(s.lat,s.lng,d.ref_lat,d.ref_lng) : null;
+    const digeser = dist !== null ? (dist > 5 ? 'DIGESER' : '') : '';
     const vals = [
       d.id, d.id_lama, d.nama_jalan, d.kecamatan, d.kelurahan, d.jenis, d.tipe_jalan,
       d.prioritas, d.flag_krusial,
       s.lat||'', s.lng||'', d.ref_lat||'', d.ref_lng||'',
+      dist ? dist.toFixed(2) : '', digeser,
       d.keterangan_lengkap, actions[d.id]||'BELUM_DITENTUKAN', d.status
     ].map(v=>csvCell(v));
     rows.push(vals.join(','));
