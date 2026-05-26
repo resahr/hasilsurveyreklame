@@ -146,6 +146,14 @@ body{display:flex;height:100vh;overflow:hidden;background:var(--bg);color:var(--
 #lightbox-cap{margin-top:10px;color:var(--muted);font-size:12px}
 #lightbox-close{position:absolute;top:16px;right:20px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer}
 
+/* OFFSET FILTER */
+#offset-filter-wrap{padding:0 12px 6px;flex-shrink:0}
+.offset-label-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.offset-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.offset-val{font-size:10px;color:var(--accent);font-weight:700;font-family:monospace}
+#offset-slider{width:100%;accent-color:var(--accent);height:4px;cursor:pointer}
+.offset-range-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:2px}
+
 /* MODAL KONFIRMASI */
 #confirm-modal{position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center}
 #confirm-modal.show{display:flex}
@@ -276,7 +284,19 @@ table.data-tbl tr:hover td{background:#161b27}
       </div>
     </div>
   </div>
-  <div id="list-header">Titik (<span id="list-count">0</span>)</div>
+  <div id="offset-filter-wrap">
+  <div class="offset-label-row">
+    <span class="offset-label">Filter Offset (Digeser)</span>
+    <span class="offset-val">Min: <span id="offset-min-val">0</span>m</span>
+  </div>
+  <input type="range" id="offset-slider" min="0" max="500" value="0" step="1">
+  <div class="offset-range-labels">
+    <span>0 m</span>
+    <span id="offset-max-label">maks</span>
+  </div>
+  <div style="font-size:9px;color:var(--muted);margin-top:3px">Tampilkan titik dengan offset ≥ nilai ini</div>
+</div>
+<div id="list-header">Titik (<span id="list-count">0</span>)</div>
   <div id="feature-list"></div>
 </div>
 
@@ -289,8 +309,7 @@ table.data-tbl tr:hover td{background:#161b27}
     <button class="tb-btn" id="btn-fit">🗺 Fit All</button>
     <div class="tb-sep"></div>
     <button class="tb-btn" id="btn-upload">📤 Upload KML/KMZ</button>
-    <div class="tb-sep"></div>
-    <button class="tb-btn" id="btn-reset-drag">↺ Reset Posisi</button>
+
     <div class="tb-sep"></div>
     <button class="tb-btn" onclick="openTable()">📋 Tabel Reklame</button>
   </div>
@@ -536,6 +555,7 @@ fetch('data/survey_data.json')
     buildFilters();
     // Load localStorage dulu (instant), lalu cloud di background
     loadActionsFromCloud().then(() => {
+      initOffsetSlider();
       renderAll();
       updateStats();
       // Auto-sync cloud setiap 30 detik (update dari browser lain)
@@ -704,6 +724,33 @@ function getFilterVals(id) {
   return [...document.querySelectorAll(`#${id} input:checked`)].map(i=>i.value);
 }
 
+// ── OFFSET SLIDER ──
+let _offsetMin = 0;
+let _offsetMax = 0;
+
+function initOffsetSlider() {
+  // Hitung max offset dari semua data
+  let maxOff = 0;
+  ALL_DATA.forEach(d => {
+    if (d.offset_m && d.offset_m > maxOff) maxOff = d.offset_m;
+  });
+  _offsetMax = Math.ceil(maxOff);
+
+  const slider = document.getElementById('offset-slider');
+  slider.max = _offsetMax;
+  slider.value = 0;
+  _offsetMin = 0;
+
+  document.getElementById('offset-max-label').textContent = _offsetMax + ' m';
+  document.getElementById('offset-min-val').textContent = '0';
+
+  slider.addEventListener('input', function() {
+    _offsetMin = parseInt(this.value);
+    document.getElementById('offset-min-val').textContent = _offsetMin;
+    renderAll();
+  });
+}
+
 function getFiltered() {
   const q = document.getElementById('search').value.toLowerCase().trim();
   const kec = getFilterVals('f-kecamatan');
@@ -719,11 +766,18 @@ function getFiltered() {
 
   return ALL_DATA.filter(d=>{
     if (q && !d.id.toLowerCase().includes(q) && !(d.nama_jalan||'').toLowerCase().includes(q)) return false;
-    // Jika tidak ada yang checked ATAU semua checked → tampil semua
     if (kec.length > 0 && kec.length < kecAll && !kec.includes(d.kecamatan)) return false;
     if (pri.length > 0 && pri.length < priAll && !pri.includes(d.prioritas)) return false;
     if (jen.length > 0 && jen.length < jenAll && !jen.includes(d.jenis)) return false;
     if (act.length > 0 && act.length < actAll && !act.includes(actions[d.id]||'')) return false;
+    // Filter offset minimum
+    if (_offsetMin > 0) {
+      const adj = adjustments[d.id];
+      const sLat = adj ? adj.lat : d.survey_lat;
+      const sLng = adj ? adj.lng : d.survey_lng;
+      const off = (sLat && d.ref_lat) ? haversine(sLat, sLng, d.ref_lat, d.ref_lng) : 0;
+      if (off < _offsetMin) return false;
+    }
     return true;
   });
 }
@@ -1017,12 +1071,7 @@ document.getElementById('btn-fit').onclick = ()=>{
   if(pts.length) map.fitBounds(pts, {padding:[40,40]});
 };
 
-document.getElementById('btn-reset-drag').onclick = ()=>{
-  if(!confirm('Reset semua posisi yang sudah di-drag?')) return;
-  adjustments = {};
-  localStorage.removeItem('reklame_adj');
-  renderAll();
-};
+
 
 document.getElementById('btn-upload').onclick = ()=>{
   const p = document.getElementById('upload-panel');
