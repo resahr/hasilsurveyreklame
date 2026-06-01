@@ -631,7 +631,8 @@ function renderAll() {
     const hasSurvey = sLat && sLng;
     const hasRef = d.ref_lat && d.ref_lng;
     const dist = (hasSurvey && hasRef) ? haversine(sLat,sLng,d.ref_lat,d.ref_lng) : null;
-    const shifted = dist && dist > 5;
+    // Marker kuning = hanya yang di-drag manual di aplikasi
+    const shifted = !!adjustments[d.id];
 
     // Survey marker
     if (hasSurvey) {
@@ -688,6 +689,7 @@ function renderAll() {
         ${badgePrioritas(d.prioritas)}
         ${d.tipe_jalan ? `<span class="badge" style="background:#1e2d45;color:#93c5fd;font-size:9px">${d.tipe_jalan}</span>` : ''}
         ${d.flag_krusial ? `<span class="badge" style="background:#3d1a1a;color:#fca5a5;font-size:9px">🚩${d.flag_krusial}</span>` : ''}
+        ${adjustments[d.id] ? '<span class="badge b-shift">↔ Digeser</span>' : ''}
         ${act === 'fix' ? '<span class="badge b-fix">✓ Fix</span>' : act === 'hapus' ? '<span class="badge b-del">✕ Hapus</span>' : '<span class="badge" style="background:#1f2937;color:#6b7280;font-size:9px">Pending</span>'}
       </div>`;
     item.addEventListener('click', ()=>{
@@ -784,13 +786,9 @@ function getFiltered() {
   // Jika "hanya digeser" aktif → bypass semua filter lain, hanya cek offset > 5m
   if (onlyShifted) {
     return ALL_DATA.filter(d => {
-      // Tetap allow pencarian teks
       if (q && !d.id.toLowerCase().includes(q) && !(d.nama_jalan||'').toLowerCase().includes(q)) return false;
-      const adj = adjustments[d.id];
-      const sLat = adj ? adj.lat : d.survey_lat;
-      const sLng = adj ? adj.lng : d.survey_lng;
-      if (!sLat || !d.ref_lat) return false;
-      return haversine(sLat, sLng, d.ref_lat, d.ref_lng) > 5;
+      // Hanya yang di-drag manual di aplikasi
+      return !!adjustments[d.id];
     });
   }
 
@@ -1153,21 +1151,17 @@ function toggleShiftedViz(enabled) {
     const newLat = adj ? adj.lat : d.survey_lat;
     const newLng = adj ? adj.lng : d.survey_lng;
 
-    // Hanya tampilkan jika memang digeser (offset > 5m)
-    const dist = haversine(newLat, newLng, d.ref_lat, d.ref_lng);
-    if (dist <= 5) return;
+    // Hanya tampilkan yang di-drag manual di aplikasi
+    if (!adj) return;
 
-    // Titik asli / semula = survey_lat/lng TANPA adjustments (posisi asli GPS)
+    // Dari posisi survey asli → posisi adjusted (hasil drag)
     const origLat = d.survey_lat;
     const origLng = d.survey_lng;
-
-    // Jika ada adjustments, tampilkan posisi survey asli sebagai "semula"
-    // Jika tidak ada adjustments, titik digeser = survey berbeda dari referensi
-    // Garis dari referensi → survey (atau dari survey asli → adjusted jika ada adj)
-    const fromLat = adj ? origLat : d.ref_lat;
-    const fromLng = adj ? origLng : d.ref_lng;
+    const fromLat = origLat;
+    const fromLng = origLng;
     const toLat   = newLat;
     const toLng   = newLng;
+    const dist = haversine(fromLat, fromLng, toLat, toLng);
 
     // Marker titik semula (transparan)
     const origMarker = L.marker([fromLat, fromLng], {
@@ -1398,12 +1392,8 @@ function updateStats() {
   const filt = getFiltered();
   document.getElementById('s-total').textContent = ALL_DATA.length;
   document.getElementById('s-survey').textContent = ALL_DATA.filter(d=>d.survey_lat).length;
-  const shifted = ALL_DATA.filter(d=>{
-    if (!d.survey_lat || !d.ref_lat) return false;
-    const adj = adjustments[d.id];
-    const sLat = adj?adj.lat:d.survey_lat, sLng=adj?adj.lng:d.survey_lng;
-    return haversine(sLat,sLng,d.ref_lat,d.ref_lng) > 5;
-  }).length;
+  // Digeser = hanya yang di-drag manual via aplikasi (ada di adjustments)
+  const shifted = Object.keys(adjustments).length;
   document.getElementById('s-shift').textContent = shifted;
   document.getElementById('s-vis').textContent = filt.length;
 }
