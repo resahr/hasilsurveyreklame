@@ -781,21 +781,25 @@ function getFiltered() {
 
   const onlyShifted = document.getElementById('cb-only-shifted')?.checked;
 
+  // Jika "hanya digeser" aktif → bypass semua filter lain, hanya cek offset > 5m
+  if (onlyShifted) {
+    return ALL_DATA.filter(d => {
+      // Tetap allow pencarian teks
+      if (q && !d.id.toLowerCase().includes(q) && !(d.nama_jalan||'').toLowerCase().includes(q)) return false;
+      const adj = adjustments[d.id];
+      const sLat = adj ? adj.lat : d.survey_lat;
+      const sLng = adj ? adj.lng : d.survey_lng;
+      if (!sLat || !d.ref_lat) return false;
+      return haversine(sLat, sLng, d.ref_lat, d.ref_lng) > 5;
+    });
+  }
+
   return ALL_DATA.filter(d=>{
     if (q && !d.id.toLowerCase().includes(q) && !(d.nama_jalan||'').toLowerCase().includes(q)) return false;
     if (kec.length > 0 && kec.length < kecAll && !kec.includes(d.kecamatan)) return false;
     if (pri.length > 0 && pri.length < priAll && !pri.includes(d.prioritas)) return false;
     if (jen.length > 0 && jen.length < jenAll && !jen.includes(d.jenis)) return false;
     if (act.length > 0 && act.length < actAll && !act.includes(actions[d.id]||'')) return false;
-    // Filter hanya titik digeser
-    if (onlyShifted) {
-      const adj = adjustments[d.id];
-      const sLat = adj ? adj.lat : d.survey_lat;
-      const sLng = adj ? adj.lng : d.survey_lng;
-      const off = (sLat && d.ref_lat) ? haversine(sLat, sLng, d.ref_lat, d.ref_lng) : 0;
-      if (off <= 5) return false;
-    }
-    // Filter offset minimum slider
     if (_offsetMin > 0) {
       const adj = adjustments[d.id];
       const sLat = adj ? adj.lat : d.survey_lat;
@@ -1216,11 +1220,27 @@ function toggleShiftedViz(enabled) {
 
 // Event handler checkbox
 document.addEventListener('DOMContentLoaded', () => {
-  // Filter hanya digeser
+  // Filter hanya digeser - bypass semua filter lain
   const cbOnly = document.getElementById('cb-only-shifted');
   if (cbOnly) {
     cbOnly.addEventListener('change', function() {
       document.getElementById('lbl-only-shifted').classList.toggle('active', this.checked);
+      // Grey-out semua filter lain saat active
+      const otherFilters = document.querySelectorAll(
+        '#f-kecamatan, #f-prioritas, #f-jenis, #f-action, #offset-filter-wrap'
+      );
+      otherFilters.forEach(el => {
+        el.style.opacity = this.checked ? '0.35' : '1';
+        el.style.pointerEvents = this.checked ? 'none' : '';
+      });
+      // Label keterangan
+      const info = document.getElementById('shifted-info');
+      if (this.checked) {
+        info.style.display = 'block';
+        info.textContent = 'Filter lain dinonaktifkan — hanya titik digeser (>5m) yang tampil';
+      } else {
+        info.style.display = 'none';
+      }
       renderAll();
     });
   }
