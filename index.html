@@ -1145,23 +1145,16 @@ function toggleShiftedViz(enabled) {
   });
 
   let count = 0;
-  ALL_DATA.forEach(d => {
-    if (!d.survey_lat || !d.survey_lng || !d.ref_lat || !d.ref_lng) return;
-
-    const adj = adjustments[d.id];
-    const newLat = adj ? adj.lat : d.survey_lat;
-    const newLng = adj ? adj.lng : d.survey_lng;
-
-    // Hanya tampilkan yang di-drag manual di aplikasi
-    if (!adj) return;
+  // Iterasi hanya dari adjustments (yang betul-betul di-drag manual)
+  Object.entries(adjustments).forEach(([id, adj]) => {
+    const d = ALL_DATA.find(x => x.id === id);
+    if (!d || !d.survey_lat || !d.survey_lng) return;
 
     // Dari posisi survey asli → posisi adjusted (hasil drag)
-    const origLat = d.survey_lat;
-    const origLng = d.survey_lng;
-    const fromLat = origLat;
-    const fromLng = origLng;
-    const toLat   = newLat;
-    const toLng   = newLng;
+    const fromLat = d.survey_lat;
+    const fromLng = d.survey_lng;
+    const toLat   = adj.lat;
+    const toLng   = adj.lng;
     const dist = haversine(fromLat, fromLng, toLat, toLng);
 
     // Marker titik semula (transparan)
