@@ -288,14 +288,15 @@ table.data-tbl tr:hover td{background:#161b27}
     </div>
     <div class="filter-group">
       <div class="filter-label">Titik Digeser</div>
-      <div class="checkbox-list" id="f-shifted">
+      <div class="checkbox-list" id="f-shifted" style="flex-direction:column;gap:5px">
+        <label class="cb-item" id="lbl-only-shifted">
+          <input type="checkbox" id="cb-only-shifted"> Tampilkan hanya yang digeser
+        </label>
         <label class="cb-item" id="lbl-shifted-view">
-          <input type="checkbox" id="cb-shifted-view"> 🔄 Tampilkan visualisasi geser
+          <input type="checkbox" id="cb-shifted-view"> 🔄 Visualisasi penggeseran
         </label>
       </div>
-      <div id="shifted-info" style="font-size:9px;color:var(--muted);margin-top:4px;display:none;line-height:1.4">
-        Titik asli (transparan) + titik baru + garis penggeseran ditampilkan
-      </div>
+      <div id="shifted-info" style="font-size:9px;color:var(--muted);margin-top:4px;display:none;line-height:1.4"></div>
     </div>
   </div>
   <div id="offset-filter-wrap">
@@ -778,13 +779,23 @@ function getFiltered() {
   const jenAll = document.querySelectorAll('#f-jenis input').length;
   const actAll = document.querySelectorAll('#f-action input').length;
 
+  const onlyShifted = document.getElementById('cb-only-shifted')?.checked;
+
   return ALL_DATA.filter(d=>{
     if (q && !d.id.toLowerCase().includes(q) && !(d.nama_jalan||'').toLowerCase().includes(q)) return false;
     if (kec.length > 0 && kec.length < kecAll && !kec.includes(d.kecamatan)) return false;
     if (pri.length > 0 && pri.length < priAll && !pri.includes(d.prioritas)) return false;
     if (jen.length > 0 && jen.length < jenAll && !jen.includes(d.jenis)) return false;
     if (act.length > 0 && act.length < actAll && !act.includes(actions[d.id]||'')) return false;
-    // Filter offset minimum
+    // Filter hanya titik digeser
+    if (onlyShifted) {
+      const adj = adjustments[d.id];
+      const sLat = adj ? adj.lat : d.survey_lat;
+      const sLng = adj ? adj.lng : d.survey_lng;
+      const off = (sLat && d.ref_lat) ? haversine(sLat, sLng, d.ref_lat, d.ref_lng) : 0;
+      if (off <= 5) return false;
+    }
+    // Filter offset minimum slider
     if (_offsetMin > 0) {
       const adj = adjustments[d.id];
       const sLat = adj ? adj.lat : d.survey_lat;
@@ -1205,6 +1216,16 @@ function toggleShiftedViz(enabled) {
 
 // Event handler checkbox
 document.addEventListener('DOMContentLoaded', () => {
+  // Filter hanya digeser
+  const cbOnly = document.getElementById('cb-only-shifted');
+  if (cbOnly) {
+    cbOnly.addEventListener('change', function() {
+      document.getElementById('lbl-only-shifted').classList.toggle('active', this.checked);
+      renderAll();
+    });
+  }
+
+  // Toggle visualisasi geser
   const cb = document.getElementById('cb-shifted-view');
   if (cb) {
     cb.addEventListener('change', function() {
