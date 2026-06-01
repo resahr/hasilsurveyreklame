@@ -571,6 +571,7 @@ fetch('data/survey_data.json')
     // Load localStorage dulu (instant), lalu cloud di background
     loadActionsFromCloud().then(() => {
       initOffsetSlider();
+      initShiftedListeners();
       renderAll();
       updateStats();
       // Auto-sync cloud setiap 30 detik (update dari browser lain)
@@ -1213,13 +1214,14 @@ function toggleShiftedViz(enabled) {
 }
 
 // Event handler checkbox
-document.addEventListener('DOMContentLoaded', () => {
-  // Filter hanya digeser - bypass semua filter lain
+// Pasang listener shifted setelah halaman siap
+// (dipanggil setelah data load, bukan DOMContentLoaded)
+function initShiftedListeners() {
   const cbOnly = document.getElementById('cb-only-shifted');
-  if (cbOnly) {
+  if (cbOnly && !cbOnly._listenerAdded) {
+    cbOnly._listenerAdded = true;
     cbOnly.addEventListener('change', function() {
       document.getElementById('lbl-only-shifted').classList.toggle('active', this.checked);
-      // Grey-out semua filter lain saat active
       const otherFilters = document.querySelectorAll(
         '#f-kecamatan, #f-prioritas, #f-jenis, #f-action, #offset-filter-wrap'
       );
@@ -1227,11 +1229,10 @@ document.addEventListener('DOMContentLoaded', () => {
         el.style.opacity = this.checked ? '0.35' : '1';
         el.style.pointerEvents = this.checked ? 'none' : '';
       });
-      // Label keterangan
       const info = document.getElementById('shifted-info');
       if (this.checked) {
         info.style.display = 'block';
-        info.textContent = 'Filter lain dinonaktifkan — hanya titik digeser (>5m) yang tampil';
+        info.textContent = 'Filter lain dinonaktifkan — hanya titik digeser (manual) yang tampil';
       } else {
         info.style.display = 'none';
       }
@@ -1239,15 +1240,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Toggle visualisasi geser
-  const cb = document.getElementById('cb-shifted-view');
-  if (cb) {
-    cb.addEventListener('change', function() {
+  const cbViz = document.getElementById('cb-shifted-view');
+  if (cbViz && !cbViz._listenerAdded) {
+    cbViz._listenerAdded = true;
+    cbViz.addEventListener('change', function() {
       document.getElementById('lbl-shifted-view').classList.toggle('active', this.checked);
       toggleShiftedViz(this.checked);
     });
   }
-});
+}
 
 // ─────────────────── UPLOAD KML ───────────────────
 document.getElementById('upload-kml').onchange = function(e) {
