@@ -287,6 +287,15 @@ table.data-tbl tr:hover td{background:#161b27}
       </div>
     </div>
     <div class="filter-group">
+      <div class="filter-label">Survey Terbaru</div>
+      <div class="checkbox-list" id="f-survey-baru" style="flex-direction:column;gap:5px">
+        <label class="cb-item" id="lbl-only-baru">
+          <input type="checkbox" id="cb-only-baru"> 🆕 Tampilkan hanya survey terbaru
+        </label>
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:3px">71 titik dari survey batch terbaru</div>
+    </div>
+    <div class="filter-group">
       <div class="filter-label">Titik Digeser</div>
       <div class="checkbox-list" id="f-shifted" style="flex-direction:column;gap:5px">
         <label class="cb-item" id="lbl-only-shifted">
@@ -690,6 +699,7 @@ function renderAll() {
         ${badgePrioritas(d.prioritas)}
         ${d.tipe_jalan ? `<span class="badge" style="background:#1e2d45;color:#93c5fd;font-size:9px">${d.tipe_jalan}</span>` : ''}
         ${d.flag_krusial ? `<span class="badge" style="background:#3d1a1a;color:#fca5a5;font-size:9px">🚩${d.flag_krusial}</span>` : ''}
+        ${d.baru_survey ? '<span class="badge" style="background:#064e3b;color:#6ee7b7;font-size:9px">🆕 Baru</span>' : ''}
         ${adjustments[d.id] ? '<span class="badge b-shift">↔ Digeser</span>' : ''}
         ${act === 'fix' ? '<span class="badge b-fix">✓ Fix</span>' : act === 'hapus' ? '<span class="badge b-del">✕ Hapus</span>' : '<span class="badge" style="background:#1f2937;color:#6b7280;font-size:9px">Pending</span>'}
       </div>`;
@@ -783,8 +793,17 @@ function getFiltered() {
   const actAll = document.querySelectorAll('#f-action input').length;
 
   const onlyShifted = document.getElementById('cb-only-shifted')?.checked;
+  const onlyBaru    = document.getElementById('cb-only-baru')?.checked;
 
-  // Jika "hanya digeser" aktif → bypass semua filter lain, hanya cek offset > 5m
+  // Jika "hanya survey terbaru" aktif → bypass filter lain
+  if (onlyBaru) {
+    return ALL_DATA.filter(d => {
+      if (q && !d.id.toLowerCase().includes(q) && !(d.nama_jalan||'').toLowerCase().includes(q)) return false;
+      return !!d.baru_survey;
+    });
+  }
+
+  // Jika "hanya digeser" aktif → bypass semua filter lain
   if (onlyShifted) {
     return ALL_DATA.filter(d => {
       if (q && !d.id.toLowerCase().includes(q) && !(d.nama_jalan||'').toLowerCase().includes(q)) return false;
@@ -1210,6 +1229,15 @@ function toggleShiftedViz(enabled) {
 // Pasang listener shifted setelah halaman siap
 // (dipanggil setelah data load, bukan DOMContentLoaded)
 function initShiftedListeners() {
+  const cbBaru = document.getElementById('cb-only-baru');
+  if (cbBaru && !cbBaru._listenerAdded) {
+    cbBaru._listenerAdded = true;
+    cbBaru.addEventListener('change', function() {
+      document.getElementById('lbl-only-baru').classList.toggle('active', this.checked);
+      renderAll();
+    });
+  }
+
   const cbOnly = document.getElementById('cb-only-shifted');
   if (cbOnly && !cbOnly._listenerAdded) {
     cbOnly._listenerAdded = true;
